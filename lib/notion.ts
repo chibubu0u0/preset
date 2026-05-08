@@ -220,3 +220,87 @@ export async function updateStyleFamily(pageId: string, classification: StyleCla
     body: JSON.stringify({ properties })
   });
 }
+
+export type StyleSummary = {
+  name: string;
+  count: number;
+};
+
+export async function listStyleFamilyCounts(): Promise<StyleSummary[]> {
+  const p = propNames();
+  const dataSourceId = requireEnv("NOTION_DATA_SOURCE_ID");
+  const counts = new Map<string, number>();
+  let startCursor: string | null = null;
+
+  do {
+    const body: any = {
+      page_size: 100,
+      filter: {
+        property: p.styleFamily,
+        select: { is_not_empty: true }
+      }
+    };
+    if (startCursor) body.start_cursor = startCursor;
+
+    const data = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+
+    for (const page of data.results || []) {
+      const name = getSelect(page, p.styleFamily);
+      if (!name || name === "待整理") continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+
+    startCursor = data.has_more ? data.next_cursor : null;
+  } while (startCursor);
+
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant"));
+}
+
+export async function queryStyleExamples(styleFamily: string, limit = 8) {
+  const p = propNames();
+  const dataSourceId = requireEnv("NOTION_DATA_SOURCE_ID");
+  const data = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+    method: "POST",
+    body: JSON.stringify({
+      page_size: Math.min(Math.max(limit, 1), 20),
+      filter: {
+        and: [
+          { property: p.styleFamily, select: { equals: styleFamily } },
+          { property: p.trainingReady, checkbox: { equals: true } }
+        ]
+      }
+    })
+  });
+
+  let pages = data.results || [];
+
+  // If no Training Ready pages exist for this family, fall back to any page in the family.
+  if (!pages.length) {
+    const fallback = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        page_size: Math.min(Math.max(limit, 1), 20),
+        filter: { property: p.styleFamily, select: { equals: styleFamily } }
+      })
+    });
+    pages = fallback.results || [];
+  }
+
+  return pages.map((page: any) => ({
+    aiStyleCluster: getSelect(page, p.styleCluster),
+    rawStyleName: getRichText(page, p.rawStyleName),
+    summary: getRichText(page, p.summary),
+    tags: getMultiSelect(page, p.tags),
+    lightroomRecipe: getRichText(page, p.lightroomRecipe),
+    basicParams: getRichText(page, p.lightroomBasic),
+    colorParams: getRichText(page, p.lightroomColor),
+    toneCurveNotes: getRichText(page, p.toneCurve),
+    webPreviewParams: getRichText(page, p.webPreview),
+    confidence: page.properties?.[p.confidence]?.number || null
+  }));
+}

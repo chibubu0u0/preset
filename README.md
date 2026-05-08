@@ -1,183 +1,109 @@
-# Eric Tone Dataset Builder — Style Family Edition
+# Eric Tone Public + Admin
 
-這是一個 Next.js / Vercel 原型，用來：
+這版包含兩個入口：
 
-1. 上傳原圖 + 調色後圖片
-2. 直接從瀏覽器上傳到 Cloudinary
-3. 用 OpenAI Vision 分析調色差異
-4. 產生 Lightroom Recipe / Web Preview Params
-5. 寫回 Notion
-6. 針對既有資料執行「AI 整理 Style Family」
+- `/`：使用者前台。使用者上傳一張照片，選擇 Style Family，產生 Lightroom 建議數值與近似預覽。
+- `/admin`：資料集後台。保留單筆 / 批次上傳、Lightroom Recipe 分析、Style Family 二次分類、未分類數量顯示。
 
----
+## 部署方式
 
-## 新增功能
-
-這版新增一個後台頁籤：
-
-```text
-AI 整理 Style Family
-```
-
-它會先顯示目前 Notion 中 `Style Family` 空白的資料筆數，並讀取這些資料，根據既有欄位：
-
-- AI Style Cluster
-- AI Analysis Summary
-- Color Change Tags
-- Lightroom Recipe
-- Lightroom Basic Params
-- Lightroom Color Params
-- Tone Curve Notes
-
-讓 AI 從固定分類中選一個正式分類，並寫回 `Style Family`。
-
----
-
-## Notion 欄位需求
-
-請確認 Notion database / data source 至少有這些欄位：
-
-| 欄位名稱 | 類型 |
-|---|---|
-| Photo ID | Title |
-| Original Image | Files & media |
-| Edited Image | Files & media |
-| AI Status | Status |
-| AI Style Cluster | Select |
-| Scene Auto | Select |
-| Lighting Auto | Select |
-| Subject Auto | Select |
-| Color Change Tags | Multi-select |
-| AI Analysis Summary | Text / Rich text |
-| Confidence Score | Number |
-| Training Ready | Checkbox |
-| AI Error | Text / Rich text |
-| Lightroom Recipe | Text / Rich text |
-| Lightroom Basic Params | Text / Rich text |
-| Lightroom Color Params | Text / Rich text |
-| Tone Curve Notes | Text / Rich text |
-| Web Preview Params | Text / Rich text |
-| AI Raw Style Name | Text / Rich text |
-| Style Family | Select |
-
-`Style Family` 建議 Select 選項：
-
-```text
-冷調自然
-冷調城市
-低光夜景
-暖調室內
-柔霧暖光
-底片褪色
-清透日常
-黑白顆粒
-待整理
-```
-
-`AI Status` 建議 Status 選項：
-
-```text
-未開始
-進行中
-已完成
-失敗
-```
-
----
+1. 解壓縮 zip。
+2. 刪掉 GitHub repo 裡舊檔案。
+3. 上傳這版所有檔案。
+4. 不要上傳 `.env.local`、`.env`、`node_modules`、`.next`、zip 檔。
+5. 到 Vercel 重新部署。
 
 ## Vercel Environment Variables
 
-把 `.env.example` 裡的變數填到：
-
-```text
-Vercel → Project → Settings → Environment Variables
-```
-
-必填：
+保留原本的：
 
 ```env
-OPENAI_API_KEY=sk-xxxxx
+OPENAI_API_KEY=你的_OpenAI_API_Key
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_IMAGE_DETAIL=low
 
-NOTION_API_KEY=ntn_xxxxx
-NOTION_DATA_SOURCE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+NOTION_API_KEY=你的_Notion_secret
+NOTION_DATA_SOURCE_ID=你的_Notion_Data_Source_ID
 NOTION_VERSION=2025-09-03
 
-NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=你的_cloud_name
 NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=eric_tone_unsigned
 NEXT_PUBLIC_CLOUDINARY_FOLDER=eric-tone-dataset
-```
 
-新增的 Style Family 相關變數：
+NOTION_TITLE_PROPERTY=Photo ID
+NOTION_ORIGINAL_IMAGE_PROPERTY=Original Image
+NOTION_EDITED_IMAGE_PROPERTY=Edited Image
+NOTION_AI_STATUS_PROPERTY=AI Status
+NOTION_STYLE_CLUSTER_PROPERTY=AI Style Cluster
+NOTION_SCENE_PROPERTY=Scene Auto
+NOTION_LIGHTING_PROPERTY=Lighting Auto
+NOTION_SUBJECT_PROPERTY=Subject Auto
+NOTION_TAGS_PROPERTY=Color Change Tags
+NOTION_SUMMARY_PROPERTY=AI Analysis Summary
+NOTION_CONFIDENCE_PROPERTY=Confidence Score
+NOTION_TRAINING_READY_PROPERTY=Training Ready
+NOTION_ERROR_PROPERTY=AI Error
 
-```env
+NOTION_LIGHTROOM_RECIPE_PROPERTY=Lightroom Recipe
+NOTION_LIGHTROOM_BASIC_PARAMS_PROPERTY=Lightroom Basic Params
+NOTION_LIGHTROOM_COLOR_PARAMS_PROPERTY=Lightroom Color Params
+NOTION_TONE_CURVE_NOTES_PROPERTY=Tone Curve Notes
+NOTION_WEB_PREVIEW_PARAMS_PROPERTY=Web Preview Params
+
 NOTION_RAW_STYLE_NAME_PROPERTY=AI Raw Style Name
 NOTION_STYLE_FAMILY_PROPERTY=Style Family
 STYLE_FAMILY_OPTIONS=冷調自然,冷調城市,低光夜景,暖調室內,柔霧暖光,底片褪色,清透日常,黑白顆粒,待整理
 ```
 
----
+## Notion 欄位需求
 
-## 部署
+同一個資料庫至少需要：
 
-```bash
-npm install
-npm run build
-```
+- Photo ID：Title
+- Original Image：Files & media
+- Edited Image：Files & media
+- AI Status：Status，選項包含 未開始 / 進行中 / 已完成 / 失敗
+- AI Style Cluster：Select
+- Scene Auto：Select
+- Lighting Auto：Select
+- Subject Auto：Select
+- Color Change Tags：Multi-select
+- AI Analysis Summary：Text / Rich text
+- Lightroom Recipe：Text / Rich text
+- Lightroom Basic Params：Text / Rich text
+- Lightroom Color Params：Text / Rich text
+- Tone Curve Notes：Text / Rich text
+- Web Preview Params：Text / Rich text
+- Confidence Score：Number
+- Training Ready：Checkbox
+- AI Error：Text / Rich text
+- AI Raw Style Name：Text / Rich text
+- Style Family：Select
 
-部署到 Vercel 時，如果 install 很久，可以在 Vercel Build Settings 把 Install Command 改成：
+Style Family 選項建議：
 
-```bash
-npm install --no-audit --no-fund
-```
+- 冷調自然
+- 冷調城市
+- 低光夜景
+- 暖調室內
+- 柔霧暖光
+- 底片褪色
+- 清透日常
+- 黑白顆粒
+- 待整理
 
----
+## 使用者前台邏輯
 
-## 使用流程
+前台不會重新訓練模型，而是：
 
-### 單筆上傳
+1. 從 Notion 讀取目前 Style Family 的數量。
+2. 使用者選擇風格並上傳照片。
+3. 系統讀取該風格下的代表資料文字。
+4. OpenAI 根據照片 + 代表資料產生 Lightroom 建議值。
+5. 前台顯示建議文字與近似預覽。
 
-1. 選原圖
-2. 選調色後圖片
-3. 按開始分析
-4. 寫回 Notion
+## 注意
 
-### 批次上傳
-
-建議檔名一一對應：
-
-```text
-original/001.jpg
-edited/001.jpg
-
-original/002.jpg
-edited/002.jpg
-```
-
-### AI 整理 Style Family
-
-1. 確認 Notion 有 `Style Family` 欄位
-2. 確認 Select 選項已建立
-3. 到頁籤「AI 整理 Style Family」
-4. 選一次處理 10 / 25 / 50 筆
-5. 先看「目前 Style Family 尚未分類」筆數
-6. 按開始整理未分類資料
-
-建議一次先跑 25 筆；跑完再按一次，直到沒有空白資料。
-
-
-## Style Family 分類速度建議
-
-`AI 整理 Style Family` 會逐筆呼叫 OpenAI 與 Notion。Vercel 函式有執行時間限制，建議每次先處理 5 筆，處理完再按一次。若一次處理 25 或 50 筆，可能會逾時並回傳非 JSON 錯誤。
-
-
-## 未分類數量顯示
-
-在「AI 整理 Style Family」頁籤中，系統會呼叫：
-
-```text
-GET /api/classify-styles
-```
-
-並計算 Notion 裡 `Style Family` 為空白的資料筆數。每次分類完成後也會自動更新剩餘筆數。
+- 前台預覽只是用網頁參數近似，不能 100% 等同 Lightroom。
+- 建議繼續使用小圖做分析，上傳前會自動壓縮。
+- `/admin` 目前是原型後台，若要公開網站，建議後續再加真正的登入或 Vercel Password Protection。

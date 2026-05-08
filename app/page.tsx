@@ -1,5 +1,5 @@
-import DatasetBuilder from "@/components/DatasetBuilder";
+import PublicToneTool from "@/components/PublicToneTool";
 
 export default function Page() {
-  return <DatasetBuilder />;
+  return <PublicToneTool />;
 }

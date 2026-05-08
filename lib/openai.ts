@@ -262,3 +262,147 @@ Tone Curve Notes: ${input.toneCurveNotes || ""}`
   if (!output) throw new Error("OpenAI response did not contain output text.");
   return JSON.parse(output) as StyleClassification;
 }
+
+export type UserRecipeAnalysis = {
+  photo_assessment: string;
+  lightroom_recipe: string;
+  lightroom_basic_params: string;
+  lightroom_color_params: string;
+  tone_curve_notes: string;
+  usage_notes: string;
+  web_preview_params: Record<string, number | string | boolean>;
+  confidence_score: number;
+};
+
+export async function generateRecipeForUserPhoto(input: {
+  imageUrl: string;
+  styleFamily: string;
+  examples: Array<{
+    aiStyleCluster?: string;
+    rawStyleName?: string;
+    summary?: string;
+    tags?: string[];
+    lightroomRecipe?: string;
+    basicParams?: string;
+    colorParams?: string;
+    toneCurveNotes?: string;
+    webPreviewParams?: string;
+  }>;
+}): Promise<UserRecipeAnalysis> {
+  const model = optionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
+  const examplesText = input.examples
+    .slice(0, 8)
+    .map((ex, idx) => {
+      return `範例 ${idx + 1}
+AI Style Cluster: ${ex.aiStyleCluster || ""}
+Raw Style Name: ${ex.rawStyleName || ""}
+Summary: ${ex.summary || ""}
+Tags: ${(ex.tags || []).join("、")}
+Lightroom Recipe: ${ex.lightroomRecipe || ""}
+Basic Params: ${ex.basicParams || ""}
+Color Params: ${ex.colorParams || ""}
+Tone Curve: ${ex.toneCurveNotes || ""}
+Web Preview Params: ${ex.webPreviewParams || ""}`;
+    })
+    .join("\n\n---\n\n");
+
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "photo_assessment",
+      "lightroom_recipe",
+      "lightroom_basic_params",
+      "lightroom_color_params",
+      "tone_curve_notes",
+      "usage_notes",
+      "web_preview_params",
+      "confidence_score"
+    ],
+    properties: {
+      photo_assessment: { type: "string" },
+      lightroom_recipe: { type: "string" },
+      lightroom_basic_params: { type: "string" },
+      lightroom_color_params: { type: "string" },
+      tone_curve_notes: { type: "string" },
+      usage_notes: { type: "string" },
+      web_preview_params: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "exposure",
+          "contrast",
+          "highlights",
+          "shadows",
+          "whites",
+          "blacks",
+          "temperature",
+          "tint",
+          "vibrance",
+          "saturation",
+          "grain",
+          "vignette",
+          "fade",
+          "clarity"
+        ],
+        properties: {
+          exposure: { type: "number" },
+          contrast: { type: "number" },
+          highlights: { type: "number" },
+          shadows: { type: "number" },
+          whites: { type: "number" },
+          blacks: { type: "number" },
+          temperature: { type: "number" },
+          tint: { type: "number" },
+          vibrance: { type: "number" },
+          saturation: { type: "number" },
+          grain: { type: "number" },
+          vignette: { type: "number" },
+          fade: { type: "number" },
+          clarity: { type: "number" }
+        }
+      },
+      confidence_score: { type: "number" }
+    }
+  };
+
+  const data = await responsesCreate({
+    model,
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: `你是 Eric Tone Lightroom Assistant。請根據使用者上傳的照片，以及 Eric 已整理出的調色資料庫範例，產生一組適合這張照片的 Lightroom 建議數值。
+
+選定風格：${input.styleFamily}
+
+參考資料庫範例：
+${examplesText || "目前沒有足夠範例，請用保守、自然的方式建議。"}
+
+要求：
+1. 不要聲稱這是精準 Lightroom 自動套用，只能說是建議值。
+2. 根據使用者照片的曝光、光線、主體與風格範例調整數值。
+3. 若照片不適合此風格，請在 usage_notes 裡提醒。
+4. 使用繁體中文。
+5. 數值請接近 Lightroom 調整邏輯，不要過度極端。`
+          },
+          { type: "input_image", image_url: input.imageUrl, detail: optionalEnv("OPENAI_IMAGE_DETAIL", "low") }
+        ]
+      }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "user_lightroom_recipe",
+        strict: true,
+        schema
+      }
+    }
+  });
+
+  const output = extractOutputText(data);
+  if (!output) throw new Error("OpenAI response did not contain output text.");
+  return JSON.parse(output) as UserRecipeAnalysis;
+}

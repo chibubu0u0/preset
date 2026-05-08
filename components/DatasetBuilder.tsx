@@ -315,10 +315,10 @@ export default function DatasetBuilder() {
     <main className="container">
       <div className="header">
         <div>
-          <h1>Eric Tone Dataset Builder</h1>
-          <p>建立調色前後資料集、產生 Lightroom Recipe，並用固定 Style Family 整理你的 AI 分類。</p>
+          <h1>Eric Tone Admin</h1>
+          <p>管理資料集、批次分析前後圖，並整理 Style Family。一般使用者前台在 /。</p>
         </div>
-        <div className="badge">Admin Prototype</div>
+        <a className="badge" href="/">前往使用者前台</a>
       </div>
 
       <div className="tabs">
