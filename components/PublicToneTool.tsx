@@ -12,6 +12,19 @@ type RecipeResult = {
     lightroom_color_params: string;
     tone_curve_notes: string;
     usage_notes: string;
+    confidence_explanation?: string;
+    confidence_breakdown?: {
+      style_match: number;
+      technical_safety: number;
+      lightroom_usability: number;
+    };
+    lightroom_values?: {
+      basic: Record<string, number>;
+      hsl: Record<string, { hue: number; saturation: number; luminance: number }>;
+      color_grading: Record<string, any>;
+      effects: Record<string, number>;
+      calibration: Record<string, number>;
+    };
     web_preview_params: Record<string, number | string | boolean>;
     confidence_score: number;
   };
@@ -347,7 +360,10 @@ const lightroomSliderGroups: SliderGroup[] = [
       { key: "highlights", label: "Highlights", min: -100, max: 100 },
       { key: "shadows", label: "Shadows", min: -100, max: 100 },
       { key: "whites", label: "Whites", min: -100, max: 100 },
-      { key: "blacks", label: "Blacks", min: -100, max: 100 }
+      { key: "blacks", label: "Blacks", min: -100, max: 100 },
+      { key: "texture", label: "Texture", min: -100, max: 100 },
+      { key: "clarity", label: "Clarity", min: -100, max: 100 },
+      { key: "dehaze", label: "Dehaze", min: -100, max: 100 }
     ]
   },
   {
@@ -364,7 +380,6 @@ const lightroomSliderGroups: SliderGroup[] = [
     title: "Effects",
     subtitle: "質感、霧面與邊緣氛圍",
     sliders: [
-      { key: "clarity", label: "Clarity", min: -100, max: 100 },
       { key: "fade", label: "Fade", min: 0, max: 100 },
       { key: "grain", label: "Grain", min: 0, max: 100 },
       { key: "vignette", label: "Vignette", min: -100, max: 100 }
@@ -410,8 +425,94 @@ function LightroomSlider({ spec, params }: { spec: SliderSpec; params: Record<st
   );
 }
 
+const hslRows = [
+  ["red", "Red"],
+  ["orange", "Orange"],
+  ["yellow", "Yellow"],
+  ["green", "Green"],
+  ["aqua", "Aqua"],
+  ["blue", "Blue"],
+  ["purple", "Purple"],
+  ["magenta", "Magenta"]
+] as const;
+
+function signed(value: any, precision = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  const text = n.toFixed(precision);
+  return n > 0 ? `+${text}` : text;
+}
+
+function ConfidencePanel({ analysis }: { analysis: NonNullable<RecipeResult["analysis"]> }) {
+  const b = analysis.confidence_breakdown;
+  return (
+    <div className="confidence-box">
+      <div className="row">
+        <strong>Confidence</strong>
+        <strong>{Math.round(analysis.confidence_score)}%</strong>
+      </div>
+      {b && (
+        <div className="confidence-grid">
+          <div><span>Style Match</span><strong>{Math.round(b.style_match)}%</strong></div>
+          <div><span>Technical Safety</span><strong>{Math.round(b.technical_safety)}%</strong></div>
+          <div><span>Lightroom Usability</span><strong>{Math.round(b.lightroom_usability)}%</strong></div>
+        </div>
+      )}
+      {analysis.confidence_explanation && <p>{analysis.confidence_explanation}</p>}
+    </div>
+  );
+}
+
+function HslTable({ values }: { values: NonNullable<RecipeResult["analysis"]>["lightroom_values"] }) {
+  if (!values?.hsl) return null;
+  return (
+    <section className="lr-section lr-value-section">
+      <details open>
+        <summary><span>HSL / Color Mixer</span><small>完整 8 色 Hue / Saturation / Luminance</small></summary>
+        <div className="hsl-table-wrap">
+          <table className="hsl-table">
+            <thead><tr><th>Color</th><th>Hue</th><th>Sat</th><th>Lum</th></tr></thead>
+            <tbody>
+              {hslRows.map(([key, label]) => {
+                const v = values.hsl[key];
+                return (
+                  <tr key={key}>
+                    <td>{label}</td>
+                    <td>{signed(v?.hue)}</td>
+                    <td>{signed(v?.saturation)}</td>
+                    <td>{signed(v?.luminance)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  );
+}
+
+function ValueGrid({ title, subtitle, values }: { title: string; subtitle?: string; values: Array<[string, any]> }) {
+  return (
+    <section className="lr-section lr-value-section">
+      <details open>
+        <summary><span>{title}</span>{subtitle && <small>{subtitle}</small>}</summary>
+        <div className="value-grid">
+          {values.map(([label, value]) => (
+            <div className="value-chip" key={label}>
+              <span>{label}</span>
+              <strong>{typeof value === "number" ? signed(value) : String(value ?? "0")}</strong>
+            </div>
+          ))}
+        </div>
+      </details>
+    </section>
+  );
+}
+
 function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult["analysis"]> }) {
-  const params = analysis.web_preview_params || {};
+  const params = analysis.lightroom_values?.basic || analysis.web_preview_params || {};
+  const values = analysis.lightroom_values;
 
   return (
     <div className="lightroom-shell">
@@ -429,11 +530,12 @@ function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult[
             <span className="hist hist-b" />
             <span className="hist hist-c" />
           </div>
-          <p>這裡把 AI 產生的 Lightroom 建議數值轉成可視化滑桿；不是官方 Adobe 介面，但用類似 Develop 面板的方式讓數值更好讀。</p>
-          <div className="lr-score">
-            <span>Confidence</span>
-            <strong>{Math.round(analysis.confidence_score)}%</strong>
+          <p>這裡顯示 AI 產生的 Lightroom 建議值。數值面板是只讀式，不提供使用者手動調強度；實際微調仍建議以 Lightroom 裡的畫面為準。</p>
+          <div className="color-rule-card">
+            <strong>Eric 色彩規則</strong>
+            <span>Vibrance 通常 +45～+55；Saturation 約為 Vibrance 的 -1/2，例如 +50 / -25。</span>
           </div>
+          <ConfidencePanel analysis={analysis} />
         </div>
         <aside className="lr-panel">
           {lightroomSliderGroups.map((group) => (
@@ -451,6 +553,53 @@ function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult[
               </details>
             </section>
           ))}
+
+          {values && <HslTable values={values} />}
+
+          {values?.color_grading && (
+            <ValueGrid
+              title="Color Grading"
+              subtitle="陰影 / 中間調 / 高光"
+              values={[
+                ["Shadow Hue", values.color_grading.shadows?.hue],
+                ["Shadow Sat", values.color_grading.shadows?.saturation],
+                ["Mid Hue", values.color_grading.midtones?.hue],
+                ["Mid Sat", values.color_grading.midtones?.saturation],
+                ["Highlight Hue", values.color_grading.highlights?.hue],
+                ["Highlight Sat", values.color_grading.highlights?.saturation],
+                ["Blending", values.color_grading.blending],
+                ["Balance", values.color_grading.balance]
+              ]}
+            />
+          )}
+
+          {values?.effects && (
+            <ValueGrid
+              title="Effects"
+              subtitle="顆粒與暗角"
+              values={[
+                ["Grain Amount", values.effects.grain_amount],
+                ["Grain Size", values.effects.grain_size],
+                ["Grain Roughness", values.effects.grain_roughness],
+                ["Vignette", values.effects.vignette]
+              ]}
+            />
+          )}
+
+          {values?.calibration && (
+            <ValueGrid
+              title="Calibration"
+              subtitle="進階校準建議"
+              values={[
+                ["Red Primary Hue", values.calibration.red_primary_hue],
+                ["Red Primary Sat", values.calibration.red_primary_saturation],
+                ["Green Primary Hue", values.calibration.green_primary_hue],
+                ["Green Primary Sat", values.calibration.green_primary_saturation],
+                ["Blue Primary Hue", values.calibration.blue_primary_hue],
+                ["Blue Primary Sat", values.calibration.blue_primary_saturation]
+              ]}
+            />
+          )}
         </aside>
       </div>
     </div>

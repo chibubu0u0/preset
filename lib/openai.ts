@@ -263,6 +263,61 @@ Tone Curve Notes: ${input.toneCurveNotes || ""}`
   return JSON.parse(output) as StyleClassification;
 }
 
+export type LightroomColorTriplet = {
+  hue: number;
+  saturation: number;
+  luminance: number;
+};
+
+export type LightroomValues = {
+  basic: {
+    temperature: number;
+    tint: number;
+    exposure: number;
+    contrast: number;
+    highlights: number;
+    shadows: number;
+    whites: number;
+    blacks: number;
+    texture: number;
+    clarity: number;
+    dehaze: number;
+    vibrance: number;
+    saturation: number;
+  };
+  hsl: {
+    red: LightroomColorTriplet;
+    orange: LightroomColorTriplet;
+    yellow: LightroomColorTriplet;
+    green: LightroomColorTriplet;
+    aqua: LightroomColorTriplet;
+    blue: LightroomColorTriplet;
+    purple: LightroomColorTriplet;
+    magenta: LightroomColorTriplet;
+  };
+  color_grading: {
+    shadows: LightroomColorTriplet;
+    midtones: LightroomColorTriplet;
+    highlights: LightroomColorTriplet;
+    blending: number;
+    balance: number;
+  };
+  effects: {
+    grain_amount: number;
+    grain_size: number;
+    grain_roughness: number;
+    vignette: number;
+  };
+  calibration: {
+    red_primary_hue: number;
+    red_primary_saturation: number;
+    green_primary_hue: number;
+    green_primary_saturation: number;
+    blue_primary_hue: number;
+    blue_primary_saturation: number;
+  };
+};
+
 export type UserRecipeAnalysis = {
   photo_assessment: string;
   lightroom_recipe: string;
@@ -270,6 +325,13 @@ export type UserRecipeAnalysis = {
   lightroom_color_params: string;
   tone_curve_notes: string;
   usage_notes: string;
+  confidence_explanation: string;
+  confidence_breakdown: {
+    style_match: number;
+    technical_safety: number;
+    lightroom_usability: number;
+  };
+  lightroom_values: LightroomValues;
   web_preview_params: Record<string, number | string | boolean>;
   confidence_score: number;
 };
@@ -308,6 +370,17 @@ Web Preview Params: ${ex.webPreviewParams || ""}`;
     })
     .join("\n\n---\n\n");
 
+  const colorTripletSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["hue", "saturation", "luminance"],
+    properties: {
+      hue: { type: "number" },
+      saturation: { type: "number" },
+      luminance: { type: "number" }
+    }
+  };
+
   const schema = {
     type: "object",
     additionalProperties: false,
@@ -318,6 +391,9 @@ Web Preview Params: ${ex.webPreviewParams || ""}`;
       "lightroom_color_params",
       "tone_curve_notes",
       "usage_notes",
+      "confidence_explanation",
+      "confidence_breakdown",
+      "lightroom_values",
       "web_preview_params",
       "confidence_score"
     ],
@@ -328,6 +404,80 @@ Web Preview Params: ${ex.webPreviewParams || ""}`;
       lightroom_color_params: { type: "string" },
       tone_curve_notes: { type: "string" },
       usage_notes: { type: "string" },
+      confidence_explanation: { type: "string" },
+      confidence_breakdown: {
+        type: "object",
+        additionalProperties: false,
+        required: ["style_match", "technical_safety", "lightroom_usability"],
+        properties: {
+          style_match: { type: "number" },
+          technical_safety: { type: "number" },
+          lightroom_usability: { type: "number" }
+        }
+      },
+      lightroom_values: {
+        type: "object",
+        additionalProperties: false,
+        required: ["basic", "hsl", "color_grading", "effects", "calibration"],
+        properties: {
+          basic: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "temperature", "tint", "exposure", "contrast", "highlights", "shadows",
+              "whites", "blacks", "texture", "clarity", "dehaze", "vibrance", "saturation"
+            ],
+            properties: {
+              temperature: { type: "number" }, tint: { type: "number" }, exposure: { type: "number" },
+              contrast: { type: "number" }, highlights: { type: "number" }, shadows: { type: "number" },
+              whites: { type: "number" }, blacks: { type: "number" }, texture: { type: "number" },
+              clarity: { type: "number" }, dehaze: { type: "number" }, vibrance: { type: "number" },
+              saturation: { type: "number" }
+            }
+          },
+          hsl: {
+            type: "object",
+            additionalProperties: false,
+            required: ["red", "orange", "yellow", "green", "aqua", "blue", "purple", "magenta"],
+            properties: {
+              red: colorTripletSchema, orange: colorTripletSchema, yellow: colorTripletSchema, green: colorTripletSchema,
+              aqua: colorTripletSchema, blue: colorTripletSchema, purple: colorTripletSchema, magenta: colorTripletSchema
+            }
+          },
+          color_grading: {
+            type: "object",
+            additionalProperties: false,
+            required: ["shadows", "midtones", "highlights", "blending", "balance"],
+            properties: {
+              shadows: colorTripletSchema, midtones: colorTripletSchema, highlights: colorTripletSchema,
+              blending: { type: "number" }, balance: { type: "number" }
+            }
+          },
+          effects: {
+            type: "object",
+            additionalProperties: false,
+            required: ["grain_amount", "grain_size", "grain_roughness", "vignette"],
+            properties: {
+              grain_amount: { type: "number" }, grain_size: { type: "number" },
+              grain_roughness: { type: "number" }, vignette: { type: "number" }
+            }
+          },
+          calibration: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "red_primary_hue", "red_primary_saturation",
+              "green_primary_hue", "green_primary_saturation",
+              "blue_primary_hue", "blue_primary_saturation"
+            ],
+            properties: {
+              red_primary_hue: { type: "number" }, red_primary_saturation: { type: "number" },
+              green_primary_hue: { type: "number" }, green_primary_saturation: { type: "number" },
+              blue_primary_hue: { type: "number" }, blue_primary_saturation: { type: "number" }
+            }
+          }
+        }
+      },
       web_preview_params: {
         type: "object",
         additionalProperties: false,
@@ -387,12 +537,17 @@ ${examplesText || "目前沒有足夠範例，請用保守、自然的方式建�
 
 要求：
 1. 不要聲稱這是精準 Lightroom 自動套用，只能說是建議值。
-2. 不要把照片重新變成某個分類；請學習 Eric 整體常見的色彩傾向，例如對比、黑位、陰影色彩、暖冷平衡、飽和度與膚色處理。
-3. 若照片有人像，務必保護膚色，不要把臉壓暗、變灰或變髒。
-4. web_preview_params 必須非常保守，避免整張過暗或出現海報化斷層。請遵守範圍：exposure -0.25 到 0.30、contrast -18 到 18、highlights -35 到 20、shadows -10 到 35、whites -20 到 15、blacks -10 到 28、temperature -450 到 450、tint -10 到 10、vibrance -12 到 18、saturation -15 到 8、grain 0 到 12、vignette -10 到 0、fade 0 到 18、clarity -10 到 10。
-5. preview_strength 由 AI 自動判斷，範圍 0.20 到 0.55。若是人像、膚色、花朵、逆光或高光容易壞掉，請用 0.25 到 0.35；若是風景或低對比照片，可用 0.35 到 0.45；只有非常適合的照片才可接近 0.50。
-6. Lightroom 文字建議可以比 web_preview_params 更完整，但仍不能過度極端。
-7. 使用繁體中文。`
+2. 不要把照片重新變成某個分類；請學習 Eric 整體常見的色彩傾向，例如對比、黑位、陰影色彩、暖冷平衡、鮮豔度、飽和度與膚色處理。
+3. Eric 的核心色彩邏輯：Vibrance 通常偏高，約 +45 到 +55；Saturation 通常是 Vibrance 的負一半，例如 Vibrance +50 時 Saturation 約 -25。這個規則非常重要，不要反過來。
+4. 若照片有人像、膚色、花朵、霓虹、紅色或黃色高彩度物件，Vibrance 可保守降到 +35 到 +45，Saturation 約 -18 到 -23；仍要維持「高 Vibrance + 負 Saturation」的方向。
+5. 優先用 HSL 控制特定顏色，不要只靠全域 Saturation。請完整給出 Red / Orange / Yellow / Green / Aqua / Blue / Purple / Magenta 的 Hue、Saturation、Luminance。
+6. lightroom_values 是給使用者照著輸入 Lightroom 的完整建議值；web_preview_params 只是網頁下載預覽用的安全近似值，兩者不要混淆。
+7. 若照片有人像，務必保護膚色，不要把臉壓暗、變灰或變髒。
+8. web_preview_params 必須非常保守，避免整張過暗或出現海報化斷層。請遵守範圍：exposure -0.25 到 0.30、contrast -18 到 18、highlights -35 到 20、shadows -10 到 35、whites -20 到 15、blacks -10 到 28、temperature -450 到 450、tint -10 到 10、vibrance -12 到 18、saturation -15 到 8、grain 0 到 12、vignette -10 到 0、fade 0 到 18、clarity -10 到 10。
+9. preview_strength 由 AI 自動判斷，範圍 0.20 到 0.55。若是人像、膚色、花朵、逆光或高光容易壞掉，請用 0.25 到 0.35；若是風景或低對比照片，可用 0.35 到 0.45；只有非常適合的照片才可接近 0.50。
+10. confidence_explanation 要說明：這張照片與資料集的相似度、這組 Lightroom 值為什麼安全或不安全、哪些顏色需要注意。confidence_breakdown 的三個分數都用 0-100。
+11. lightroom_basic_params、lightroom_color_params、tone_curve_notes、lightroom_recipe 都要用繁體中文，並包含具體數值。
+12. 使用繁體中文。`
           },
           { type: "input_image", image_url: input.imageUrl, detail: optionalEnv("OPENAI_IMAGE_DETAIL", "low") }
         ]

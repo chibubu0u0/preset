@@ -371,3 +371,74 @@ input[type="range"] {
   .lr-layout { grid-template-columns: 1fr; }
   .lr-preview-card { border-right: 0; border-bottom: 1px solid #2d2d31; }
 }
+
+.confidence-box {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055);
+  border-radius: 18px;
+  padding: 14px;
+  margin-top: 12px;
+}
+.confidence-box p { margin: 0; color: #cfc7bb; font-size: 13px; line-height: 1.55; }
+.confidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.confidence-grid div {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(0,0,0,.18);
+}
+.confidence-grid span { display: block; color: #9b948c; font-size: 11px; }
+.confidence-grid strong { display: block; margin-top: 4px; font-size: 18px; }
+.color-rule-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(244, 214, 170, .1);
+  border-radius: 18px;
+  padding: 14px;
+  margin-top: 12px;
+}
+.color-rule-card span { color: #cfc7bb; font-size: 13px; line-height: 1.55; }
+.hsl-table-wrap { overflow: auto; }
+.hsl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.hsl-table th,
+.hsl-table td {
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  padding: 8px 6px;
+  text-align: right;
+}
+.hsl-table th:first-child,
+.hsl-table td:first-child { text-align: left; color: #e8dfd3; font-weight: 700; }
+.hsl-table th { color: #9b948c; font-weight: 700; }
+.lr-value-section summary { margin-bottom: 8px; }
+.value-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.value-chip {
+  border: 1px solid rgba(255,255,255,.09);
+  background: rgba(0,0,0,.16);
+  border-radius: 14px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.value-chip span { color: #9b948c; font-size: 11px; }
+.value-chip strong { color: #f4f0ea; font-size: 13px; }
+@media (max-width: 760px) {
+  .confidence-grid { grid-template-columns: 1fr; }
+  .value-grid { grid-template-columns: 1fr; }
+}
