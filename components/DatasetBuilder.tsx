@@ -184,7 +184,7 @@ export default function DatasetBuilder() {
   const [jobs, setJobs] = useState<BatchPair[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
 
-  const [classifyLimit, setClassifyLimit] = useState(25);
+  const [classifyLimit, setClassifyLimit] = useState(5);
   const [classifyStatus, setClassifyStatus] = useState("");
   const [classifyResult, setClassifyResult] = useState<any>(null);
   const [classifyError, setClassifyError] = useState("");
@@ -267,7 +267,13 @@ export default function DatasetBuilder() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ limit: classifyLimit })
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`伺服器回傳非 JSON 內容，通常是 Vercel 函式逾時或崩潰：${text.slice(0, 180)}`);
+      }
       if (!res.ok || data?.ok === false) throw new Error(data?.error || "分類失敗");
       setClassifyStatus(`完成：處理 ${data.count} 筆`);
       setClassifyResult(data);
@@ -366,15 +372,15 @@ export default function DatasetBuilder() {
             <h2>AI 整理 Style Family</h2>
             <p>
               這個功能不會重新看圖片，只會讀 Notion 裡既有的 AI 分析文字，將 Style Family 空白的資料歸類到固定分類。
-              建議一次先處理 20–30 筆；處理完可以再按一次。
+              建議一次先處理 5 筆，避免 Vercel 函式逾時；處理完可以再按一次。
             </p>
             <div className="row">
               <label>
                 每次處理筆數：{" "}
                 <select value={classifyLimit} onChange={(e) => setClassifyLimit(Number(e.target.value))}>
+                  <option value={5}>5</option>
                   <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
+                  <option value={15}>15</option>
                 </select>
               </label>
               <button onClick={runStyleClassify}>開始整理未分類資料</button>

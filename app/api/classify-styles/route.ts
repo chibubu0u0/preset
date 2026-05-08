@@ -12,7 +12,8 @@ type ClassifyRequest = {
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as ClassifyRequest;
-    const limit = typeof body.limit === "number" ? body.limit : 25;
+    const requestedLimit = typeof body.limit === "number" ? body.limit : 5;
+    const limit = Math.min(Math.max(requestedLimit, 1), 15);
     const pages = await queryUnclassifiedPages(limit);
 
     const results: Array<{
