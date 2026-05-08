@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { classifyStyleFamily } from "@/lib/openai";
-import { pageToClassificationInput, queryUnclassifiedPages, updateStyleFamily } from "@/lib/notion";
+import { countUnclassifiedPages, pageToClassificationInput, queryUnclassifiedPages, updateStyleFamily } from "@/lib/notion";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -8,6 +8,18 @@ export const maxDuration = 60;
 type ClassifyRequest = {
   limit?: number;
 };
+
+export async function GET() {
+  try {
+    const remaining = await countUnclassifiedPages();
+    return NextResponse.json({ ok: true, remaining });
+  } catch (error: any) {
+    return NextResponse.json(
+      { ok: false, error: error?.message || "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -42,7 +54,8 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, count: results.length, results });
+    const remaining = await countUnclassifiedPages();
+    return NextResponse.json({ ok: true, count: results.length, remaining, results });
   } catch (error: any) {
     return NextResponse.json(
       { ok: false, error: error?.message || "Unknown error" },

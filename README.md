@@ -19,7 +19,7 @@
 AI 整理 Style Family
 ```
 
-它會讀取 Notion 中 `Style Family` 空白的資料，根據既有欄位：
+它會先顯示目前 Notion 中 `Style Family` 空白的資料筆數，並讀取這些資料，根據既有欄位：
 
 - AI Style Cluster
 - AI Analysis Summary
@@ -161,7 +161,8 @@ edited/002.jpg
 2. 確認 Select 選項已建立
 3. 到頁籤「AI 整理 Style Family」
 4. 選一次處理 10 / 25 / 50 筆
-5. 按開始整理未分類資料
+5. 先看「目前 Style Family 尚未分類」筆數
+6. 按開始整理未分類資料
 
 建議一次先跑 25 筆；跑完再按一次，直到沒有空白資料。
 
@@ -169,3 +170,14 @@ edited/002.jpg
 ## Style Family 分類速度建議
 
 `AI 整理 Style Family` 會逐筆呼叫 OpenAI 與 Notion。Vercel 函式有執行時間限制，建議每次先處理 5 筆，處理完再按一次。若一次處理 25 或 50 筆，可能會逾時並回傳非 JSON 錯誤。
+
+
+## 未分類數量顯示
+
+在「AI 整理 Style Family」頁籤中，系統會呼叫：
+
+```text
+GET /api/classify-styles
+```
+
+並計算 Notion 裡 `Style Family` 為空白的資料筆數。每次分類完成後也會自動更新剩餘筆數。

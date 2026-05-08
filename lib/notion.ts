@@ -179,6 +179,34 @@ export async function queryUnclassifiedPages(limit = 25) {
   return data.results || [];
 }
 
+export async function countUnclassifiedPages() {
+  const p = propNames();
+  const dataSourceId = requireEnv("NOTION_DATA_SOURCE_ID");
+  let total = 0;
+  let startCursor: string | null = null;
+
+  do {
+    const body: any = {
+      page_size: 100,
+      filter: {
+        property: p.styleFamily,
+        select: { is_empty: true }
+      }
+    };
+    if (startCursor) body.start_cursor = startCursor;
+
+    const data = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+      method: "POST",
+      body: JSON.stringify(body)
+    });
+
+    total += Array.isArray(data.results) ? data.results.length : 0;
+    startCursor = data.has_more ? data.next_cursor : null;
+  } while (startCursor);
+
+  return total;
+}
+
 export async function updateStyleFamily(pageId: string, classification: StyleClassification) {
   const p = propNames();
   const properties: Record<string, any> = {

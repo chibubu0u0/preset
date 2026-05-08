@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Tab = "single" | "batch" | "classify";
 type JobStatus = "pending" | "uploading" | "analyzing" | "done" | "error";
@@ -188,6 +188,8 @@ export default function DatasetBuilder() {
   const [classifyStatus, setClassifyStatus] = useState("");
   const [classifyResult, setClassifyResult] = useState<any>(null);
   const [classifyError, setClassifyError] = useState("");
+  const [unclassifiedCount, setUnclassifiedCount] = useState<number | null>(null);
+  const [countStatus, setCountStatus] = useState("");
 
   const pairedPreview = useMemo(() => {
     const editedMap = new Map(editedFiles.map((file) => [normalizeName(file.name), file]));
@@ -257,6 +259,31 @@ export default function DatasetBuilder() {
     setBatchRunning(false);
   }
 
+  async function refreshUnclassifiedCount() {
+    setCountStatus("讀取中…");
+    try {
+      const res = await fetch("/api/classify-styles", { method: "GET" });
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`伺服器回傳非 JSON 內容：${text.slice(0, 180)}`);
+      }
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || "讀取未分類數量失敗");
+      setUnclassifiedCount(Number(data.remaining || 0));
+      setCountStatus("已更新");
+    } catch (error: any) {
+      setCountStatus(error?.message || "讀取失敗");
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "classify" && unclassifiedCount === null) {
+      refreshUnclassifiedCount();
+    }
+  }, [tab, unclassifiedCount]);
+
   async function runStyleClassify() {
     setClassifyError("");
     setClassifyResult(null);
@@ -275,7 +302,8 @@ export default function DatasetBuilder() {
         throw new Error(`伺服器回傳非 JSON 內容，通常是 Vercel 函式逾時或崩潰：${text.slice(0, 180)}`);
       }
       if (!res.ok || data?.ok === false) throw new Error(data?.error || "分類失敗");
-      setClassifyStatus(`完成：處理 ${data.count} 筆`);
+      setClassifyStatus(`完成：處理 ${data.count} 筆，尚未分類 ${typeof data.remaining === "number" ? data.remaining : "?"} 筆`);
+      if (typeof data.remaining === "number") setUnclassifiedCount(data.remaining);
       setClassifyResult(data);
     } catch (error: any) {
       setClassifyStatus("失敗");
@@ -374,6 +402,15 @@ export default function DatasetBuilder() {
               這個功能不會重新看圖片，只會讀 Notion 裡既有的 AI 分析文字，將 Style Family 空白的資料歸類到固定分類。
               建議一次先處理 5 筆，避免 Vercel 函式逾時；處理完可以再按一次。
             </p>
+            <div className="mini-card row">
+              <div>
+                <span className="small">目前 Style Family 尚未分類</span>
+                <strong className="count-number">{unclassifiedCount === null ? "—" : unclassifiedCount}</strong>
+                <span className="small">筆</span>
+                {countStatus && <div className="small">{countStatus}</div>}
+              </div>
+              <button className="secondary" onClick={refreshUnclassifiedCount}>重新計算</button>
+            </div>
             <div className="row">
               <label>
                 每次處理筆數：{" "}

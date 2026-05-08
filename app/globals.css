@@ -125,3 +125,17 @@ pre {
   color: var(--muted);
   font-size: 12px;
 }
+
+.mini-card {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  border-radius: 22px;
+  padding: 16px;
+}
+.count-number {
+  display: inline-block;
+  margin: 0 8px;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
