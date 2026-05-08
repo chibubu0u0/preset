@@ -82,8 +82,8 @@ export async function analyzeTonePair(originalUrl: string, editedUrl: string): P
             type: "input_text",
             text: `你是一位攝影調色分析助手。請比較兩張照片：第一張是原圖，第二張是攝影師調色後的版本。\n\n任務：\n1. 分析「原圖 → 調色後」發生了哪些影像與色彩變化。\n2. 自動判斷場景、光線、主體與色彩變化標籤。\n3. 不要評價照片好壞，不要改圖，只分析調色邏輯。\n4. 用繁體中文撰寫 summary。\n5. 請用穩定、可累積資料集的方式命名 style_cluster。若無法確定就用 Style Cluster 01 / 02 這種保守命名。`
           },
-          { type: "input_image", image_url: originalUrl },
-          { type: "input_image", image_url: editedUrl }
+          { type: "input_image", image_url: originalUrl, detail: "high" },
+          { type: "input_image", image_url: editedUrl, detail: "high" }
         ]
       }
     ],
