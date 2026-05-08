@@ -168,3 +168,29 @@ pre {
   background: #f2eadf;
 }
 @media (max-width: 760px) { .preview-grid { grid-template-columns: 1fr; } }
+
+.download-button {
+  width: fit-content;
+  margin-top: 6px;
+}
+
+.preview-placeholder {
+  min-height: 220px;
+  border-radius: 20px;
+  border: 1px dashed var(--line);
+  background: rgba(255,255,255,0.45);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+  padding: 24px;
+}
+
+.compact-stack {
+  gap: 8px;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #1f1b16;
+}

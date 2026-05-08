@@ -107,3 +107,15 @@ Style Family 選項建議：
 - 前台預覽只是用網頁參數近似，不能 100% 等同 Lightroom。
 - 建議繼續使用小圖做分析，上傳前會自動壓縮。
 - `/admin` 目前是原型後台，若要公開網站，建議後續再加真正的登入或 Vercel Password Protection。
+
+## Public download preview
+
+The public page now includes a **下載調色後預覽 JPG** button. After a user uploads a photo and generates a Lightroom recipe, the browser creates a local JPG download based on the same conservative web preview parameters. This file is an approximate preview, not a full Lightroom render.
+
+Optional environment variable:
+
+```env
+NEXT_PUBLIC_DOWNLOAD_MAX_EDGE=2400
+```
+
+This limits the longest edge of the downloaded preview JPG.
