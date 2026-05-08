@@ -1,25 +1,43 @@
-# Notion 欄位設定
+# Notion Properties
 
-請在你的 Notion Data Source 建立以下欄位。欄位名稱需要和 `.env.example` 裡面一致，或你也可以在 `.env.local` 改成自己的欄位名稱。
+請在你的 Notion data source 裡建立以下欄位。欄位名稱要和 Vercel Environment Variables 對應。
 
-| 欄位名稱 | Notion 類型 | 說明 |
-|---|---|---|
-| Photo ID | Title | 每筆資料的編號，例如 `ET-20260508184312` |
-| Original Image | Files & media | 原圖，網站會寫入 Cloudinary 外部圖片 URL |
-| Edited Image | Files & media | 調色後圖片，網站會寫入 Cloudinary 外部圖片 URL |
-| AI Status | Status | 建議選項：未開始、分析中、已完成、失敗 |
-| AI Style Cluster | Select | AI 自動判斷的風格群組 |
-| Scene Auto | Select | AI 自動判斷場景 |
-| Lighting Auto | Select | AI 自動判斷光線 |
-| Subject Auto | Select | AI 自動判斷主體 |
-| Color Change Tags | Multi-select | AI 自動產生的色彩變化標籤 |
-| AI Analysis Summary | Text / Rich text | AI 用繁中寫的調色差異摘要 |
-| Confidence Score | Number | 信心分數 0–100 |
-| Training Ready | Checkbox | 是否適合進入未來訓練資料集 |
-| AI Error | Text / Rich text | 保留給錯誤訊息，目前 API 主要回傳在網頁上 |
+| Property | Type |
+|---|---|
+| Photo ID | Title |
+| Original Image | Files & media |
+| Edited Image | Files & media |
+| AI Status | Status |
+| AI Style Cluster | Select |
+| Scene Auto | Select |
+| Lighting Auto | Select |
+| Subject Auto | Select |
+| Color Change Tags | Multi-select |
+| AI Analysis Summary | Text / Rich text |
+| Lightroom Recipe | Text / Rich text |
+| Lightroom Basic Params | Text / Rich text |
+| Lightroom Color Params | Text / Rich text |
+| Tone Curve Notes | Text / Rich text |
+| Web Preview Params | Text / Rich text |
+| Confidence Score | Number |
+| Training Ready | Checkbox |
+| AI Error | Text / Rich text |
 
-## 注意
+## AI Status options
 
-- Notion Integration 必須被加入這個資料庫的 Connections。
-- Integration 需要 Insert Content 權限，因為這個網站會新增 Notion page。
-- 如果你使用新的 Notion API 版本，請使用 Data Source ID，而不是只有 Database ID。
+請建立這四種狀態，文字必須一致：
+
+- 未開始
+- 進行中
+- 已完成
+- 失敗
+
+## Vercel Environment Variables
+
+```env
+NOTION_LIGHTROOM_RECIPE_PROPERTY=Lightroom Recipe
+NOTION_LIGHTROOM_BASIC_PARAMS_PROPERTY=Lightroom Basic Params
+NOTION_LIGHTROOM_COLOR_PARAMS_PROPERTY=Lightroom Color Params
+NOTION_TONE_CURVE_NOTES_PROPERTY=Tone Curve Notes
+NOTION_WEB_PREVIEW_PARAMS_PROPERTY=Web Preview Params
+```

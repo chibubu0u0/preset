@@ -30,5 +30,10 @@ export const notionProperties = {
   summary: optionalEnv("NOTION_SUMMARY_PROPERTY", "AI Analysis Summary"),
   confidence: optionalEnv("NOTION_CONFIDENCE_PROPERTY", "Confidence Score"),
   trainingReady: optionalEnv("NOTION_TRAINING_READY_PROPERTY", "Training Ready"),
-  error: optionalEnv("NOTION_ERROR_PROPERTY", "AI Error")
+  error: optionalEnv("NOTION_ERROR_PROPERTY", "AI Error"),
+  lightroomRecipe: optionalEnv("NOTION_LIGHTROOM_RECIPE_PROPERTY", "Lightroom Recipe"),
+  lightroomBasicParams: optionalEnv("NOTION_LIGHTROOM_BASIC_PARAMS_PROPERTY", "Lightroom Basic Params"),
+  lightroomColorParams: optionalEnv("NOTION_LIGHTROOM_COLOR_PARAMS_PROPERTY", "Lightroom Color Params"),
+  toneCurveNotes: optionalEnv("NOTION_TONE_CURVE_NOTES_PROPERTY", "Tone Curve Notes"),
+  webPreviewParams: optionalEnv("NOTION_WEB_PREVIEW_PARAMS_PROPERTY", "Web Preview Params")
 };

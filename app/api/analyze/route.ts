@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { analyzeTonePair } from "../../../lib/analyze";
-import { uploadToCloudinary } from "../../../lib/cloudinary";
-import { optionalNumberEnv } from "../../../lib/env";
 import { createNotionTonePairPage } from "../../../lib/notion";
 
 export const runtime = "nodejs";
@@ -18,43 +16,43 @@ function json(payload: ApiResult, status = 200) {
   return NextResponse.json(payload, { status });
 }
 
-function validateImageFile(file: File | null, label: string) {
-  if (!file) throw new Error(`缺少 ${label} 圖片`);
-  if (!file.type.startsWith("image/")) throw new Error(`${label} 必須是圖片檔`);
+function validateUrl(value: unknown, label: string) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`缺少 ${label} URL`);
+  }
 
-  const maxUploadMb = optionalNumberEnv("MAX_UPLOAD_MB", 8);
-  const maxBytes = maxUploadMb * 1024 * 1024;
-  if (file.size > maxBytes) {
-    throw new Error(`${label} 檔案太大，目前限制 ${maxUploadMb}MB`);
+  try {
+    const url = new URL(value);
+    if (!url.protocol.startsWith("http")) {
+      throw new Error();
+    }
+    return url.toString();
+  } catch {
+    throw new Error(`${label} URL 格式不正確`);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const original = formData.get("original") as File | null;
-    const edited = formData.get("edited") as File | null;
-    const writeToNotion = formData.get("writeToNotion") !== "false";
+    const body = await request.json();
 
-    validateImageFile(original, "原圖");
-    validateImageFile(edited, "調色後");
+    const originalUrl = validateUrl(body.originalUrl, "原圖");
+    const editedUrl = validateUrl(body.editedUrl, "調色後");
+    const writeToNotion = body.writeToNotion !== false;
 
     const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-    const photoId = `ET-${timestamp}`;
+    const photoId = typeof body.photoId === "string" && body.photoId.trim()
+      ? body.photoId.trim()
+      : `ET-${timestamp}`;
 
-    const [originalUpload, editedUpload] = await Promise.all([
-      uploadToCloudinary(original!, "original"),
-      uploadToCloudinary(edited!, "edited")
-    ]);
-
-    const analysis = await analyzeTonePair(originalUpload.secure_url, editedUpload.secure_url);
+    const analysis = await analyzeTonePair(originalUrl, editedUrl);
 
     let notionPage = null;
     if (writeToNotion) {
       notionPage = await createNotionTonePairPage({
         photoId,
-        originalUrl: originalUpload.secure_url,
-        editedUrl: editedUpload.secure_url,
+        originalUrl,
+        editedUrl,
         analysis
       });
     }
@@ -64,8 +62,8 @@ export async function POST(request: Request) {
       message: writeToNotion ? "分析完成，已寫入 Notion" : "分析完成，未寫入 Notion",
       data: {
         photoId,
-        originalUrl: originalUpload.secure_url,
-        editedUrl: editedUpload.secure_url,
+        originalUrl,
+        editedUrl,
         analysis,
         notionPageId: notionPage?.id || null
       }

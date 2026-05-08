@@ -2,6 +2,23 @@
 
 import { useMemo, useState } from "react";
 
+type WebPreviewParams = {
+  exposure: number;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  temperature: number;
+  tint: number;
+  vibrance: number;
+  saturation: number;
+  clarity: number;
+  fade: number;
+  grain: number;
+  vignette: number;
+};
+
 type Analysis = {
   style_cluster: string;
   style_name_draft: string;
@@ -10,6 +27,11 @@ type Analysis = {
   subject: string;
   color_change_tags: string[];
   summary: string;
+  lightroom_recipe: string;
+  lightroom_basic_params: string;
+  lightroom_color_params: string;
+  tone_curve_notes: string;
+  web_preview_params: WebPreviewParams;
   training_ready: boolean;
   confidence_score: number;
 };
@@ -26,6 +48,21 @@ type ApiResponse = {
     notionPageId: string | null;
   };
 };
+
+type CloudinaryUploadResult = {
+  secure_url: string;
+  public_id: string;
+  bytes?: number;
+  width?: number;
+  height?: number;
+  format?: string;
+};
+
+function getPublicEnv(name: string) {
+  const value = process.env[name];
+  if (!value) throw new Error(`缺少環境變數：${name}`);
+  return value;
+}
 
 function FileDropzone({
   title,
@@ -59,11 +96,109 @@ function FileDropzone({
   );
 }
 
+async function parseJsonResponse(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(text.slice(0, 300) || `Request failed with ${res.status}`);
+  }
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("圖片讀取失敗，請換成 JPG / PNG 再試一次。"));
+    };
+    img.src = url;
+  });
+}
+
+async function compressImageForAnalysis(file: File): Promise<File> {
+  const maxLongEdge = 2500;
+  const targetQuality = 0.82;
+  const img = await loadImage(file);
+  const longEdge = Math.max(img.naturalWidth, img.naturalHeight);
+
+  if (file.size <= 3.5 * 1024 * 1024 && longEdge <= maxLongEdge) {
+    return file;
+  }
+
+  const scale = Math.min(1, maxLongEdge / longEdge);
+  const width = Math.max(1, Math.round(img.naturalWidth * scale));
+  const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("瀏覽器不支援圖片壓縮處理。");
+
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (!result) reject(new Error("圖片壓縮失敗，請換一張圖再試。"));
+        else resolve(result);
+      },
+      "image/jpeg",
+      targetQuality
+    );
+  });
+
+  const baseName = file.name.replace(/\.[^.]+$/, "");
+  return new File([blob], `${baseName}-analysis.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now()
+  });
+}
+
+async function uploadToCloudinary(file: File, label: "original" | "edited"): Promise<CloudinaryUploadResult> {
+  const cloudName = getPublicEnv("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME");
+  const uploadPreset = getPublicEnv("NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET");
+  const rootFolder = process.env.NEXT_PUBLIC_CLOUDINARY_FOLDER || "eric-tone-dataset";
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", uploadPreset);
+  formData.append("folder", `${rootFolder}/${label}`);
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await parseJsonResponse(res);
+  if (!res.ok) {
+    throw new Error(`Cloudinary upload failed: ${data?.error?.message || JSON.stringify(data)}`);
+  }
+
+  return data as CloudinaryUploadResult;
+}
+
+function RecipeBlock({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="recipe-block">
+      <h3>{title}</h3>
+      <pre>{text}</pre>
+    </div>
+  );
+}
+
 export default function Home() {
   const [original, setOriginal] = useState<File | null>(null);
   const [edited, setEdited] = useState<File | null>(null);
   const [writeToNotion, setWriteToNotion] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse["data"] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,25 +213,38 @@ export default function Home() {
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append("original", original);
-      formData.append("edited", edited);
-      formData.append("writeToNotion", String(writeToNotion));
+      setStatus("正在準備分析用小圖…");
+      const analysisOriginal = await compressImageForAnalysis(original);
+      const analysisEdited = await compressImageForAnalysis(edited);
 
+      setStatus("正在上傳原圖到 Cloudinary…");
+      const originalUpload = await uploadToCloudinary(analysisOriginal, "original");
+
+      setStatus("正在上傳調色後圖片到 Cloudinary…");
+      const editedUpload = await uploadToCloudinary(analysisEdited, "edited");
+
+      setStatus("圖片已上傳，正在交給 AI 產生 Lightroom 建議…");
       const res = await fetch("/api/analyze", {
         method: "POST",
-        body: formData
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalUrl: originalUpload.secure_url,
+          editedUrl: editedUpload.secure_url,
+          writeToNotion
+        })
       });
 
-      const data = (await res.json()) as ApiResponse;
+      const data = (await parseJsonResponse(res)) as ApiResponse;
 
       if (!res.ok || !data.ok || !data.data) {
         throw new Error(data.error || "分析失敗");
       }
 
       setResult(data.data);
+      setStatus(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知錯誤");
+      setStatus(null);
     } finally {
       setLoading(false);
     }
@@ -107,10 +255,10 @@ export default function Home() {
       <div className="shell">
         <section className="hero">
           <div className="card">
-            <div className="badge">Eric Tone AI · Dataset Uploader</div>
-            <h1>上傳前後圖，讓 AI 幫你整理調色風格。</h1>
+            <div className="badge">Eric Tone AI · Lightroom Recipe Engine</div>
+            <h1>上傳前後圖，讓 AI 幫你整理調色風格與 Lightroom 建議。</h1>
             <p>
-              這是方案 C 的第一版原型：你只要上傳原圖與調色後圖片，系統會把圖片上傳到雲端、交給 AI 分析調色差異，並可自動寫回 Notion 資料庫。
+              這版會先在瀏覽器把圖片壓成分析用小圖，再直接上傳到 Cloudinary，接著交給 AI 分析調色差異，產生 Lightroom Recipe、Tone Curve Notes 與 Web Preview Params，並可自動寫回 Notion。
             </p>
           </div>
 
@@ -120,8 +268,8 @@ export default function Home() {
               <p>上傳原圖與你調色後的成品圖。</p>
             </div>
             <div className="step">
-              <strong>02 · Analyze</strong>
-              <p>AI 比較兩張圖，判斷色溫、對比、場景、光線與色彩標籤。</p>
+              <strong>02 · Recipe</strong>
+              <p>AI 比較兩張圖，產生 Lightroom 建議數值與色彩標籤。</p>
             </div>
             <div className="step">
               <strong>03 · Save</strong>
@@ -132,7 +280,7 @@ export default function Home() {
 
         <section className="card">
           <h2>新增一組調色資料</h2>
-          <p>建議先使用 JPG / PNG，每張圖控制在 8MB 以內。你可以先取消寫入 Notion，只測試 AI 分析。</p>
+          <p>建議先使用 JPG / PNG。此版本會自動壓縮分析用圖片，原始高解析成品未來可另外儲存。</p>
 
           <div className="upload-grid">
             <FileDropzone
@@ -159,9 +307,15 @@ export default function Home() {
               分析完成後寫入 Notion
             </label>
             <button className="primary-button" disabled={loading} onClick={handleSubmit}>
-              {loading ? "分析中，請稍候…" : "開始分析"}
+              {loading ? "處理中，請稍候…" : "開始分析"}
             </button>
           </div>
+
+          {status && (
+            <div className="card result">
+              <strong>{status}</strong>
+            </div>
+          )}
 
           {error && (
             <div className="card result error">
@@ -199,6 +353,15 @@ export default function Home() {
                   <small>Confidence</small>
                   <strong>{result.analysis.confidence_score}</strong>
                 </div>
+              </div>
+
+              <div className="card recipe-card">
+                <h2>Lightroom 建議數值</h2>
+                <RecipeBlock title="完整 Recipe" text={result.analysis.lightroom_recipe} />
+                <RecipeBlock title="Basic Params" text={result.analysis.lightroom_basic_params} />
+                <RecipeBlock title="Color Params" text={result.analysis.lightroom_color_params} />
+                <RecipeBlock title="Tone Curve Notes" text={result.analysis.tone_curve_notes} />
+                <RecipeBlock title="Web Preview Params" text={JSON.stringify(result.analysis.web_preview_params, null, 2)} />
               </div>
             </div>
           )}

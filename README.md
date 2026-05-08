@@ -1,145 +1,77 @@
-# Eric Tone Web Uploader
+# Eric Tone Web Uploader — Lightroom Recipe Version
 
-這是「方案 C」的第一版網頁原型：
+這是一個 Next.js / Vercel 原型，用來建立攝影調色資料集。
 
-> 上傳原圖 + 調色後圖片 → 圖片存到 Cloudinary → OpenAI Vision 分析前後調色差異 → 寫回 Notion 資料庫
+流程：
 
-目前這個版本的目標是幫你建立「可訓練的調色資料集」，還不是讓一般使用者上傳單張照片後直接套用你的風格。等資料集累積到一定數量後，再進入調色模型 / LUT / AI 微調階段。
+1. 上傳原圖與調色後圖片
+2. 瀏覽器先自動壓縮成分析用小圖
+3. 直接上傳到 Cloudinary
+4. 將 Cloudinary 圖片 URL 交給 OpenAI Vision 分析
+5. 產生調色分析、Lightroom Recipe、Tone Curve Notes、Web Preview Params
+6. 可自動寫回 Notion Data Source
 
-## 功能
+## Required Environment Variables
 
-- 上傳 Original Image / Edited Image
-- 上傳圖片到 Cloudinary
-- 使用 OpenAI 進行前後圖調色差異分析
-- 自動產生：
-  - Style Cluster
-  - 場景
-  - 光線
-  - 主體
-  - 色彩變化標籤
-  - 調色摘要
-  - 信心分數
-  - 是否適合進入訓練資料
-- 可選擇是否寫入 Notion
-- 自動新增 Notion 資料列
-
-## 1. 安裝
-
-```bash
-npm install
-```
-
-## 2. 建立環境變數
-
-建立 `.env.local`：
-
-```bash
-cp .env.example .env.local
-```
-
-然後填入：
+請在 Vercel Project → Settings → Environment Variables 建立：
 
 ```env
-OPENAI_API_KEY=sk-your-openai-key
+OPENAI_API_KEY=sk-your-key
 OPENAI_MODEL=gpt-4.1-mini
 
-NOTION_API_KEY=secret_your_notion_integration_token
-NOTION_DATA_SOURCE_ID=your_notion_data_source_id
+NOTION_API_KEY=secret-or-ntn-your-notion-integration-token
+NOTION_DATA_SOURCE_ID=your-notion-data-source-id
 NOTION_VERSION=2025-09-03
 
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_UPLOAD_PRESET=your_unsigned_upload_preset
+NOTION_TITLE_PROPERTY=Photo ID
+NOTION_ORIGINAL_IMAGE_PROPERTY=Original Image
+NOTION_EDITED_IMAGE_PROPERTY=Edited Image
+NOTION_AI_STATUS_PROPERTY=AI Status
+NOTION_STYLE_CLUSTER_PROPERTY=AI Style Cluster
+NOTION_SCENE_PROPERTY=Scene Auto
+NOTION_LIGHTING_PROPERTY=Lighting Auto
+NOTION_SUBJECT_PROPERTY=Subject Auto
+NOTION_TAGS_PROPERTY=Color Change Tags
+NOTION_SUMMARY_PROPERTY=AI Analysis Summary
+NOTION_CONFIDENCE_PROPERTY=Confidence Score
+NOTION_TRAINING_READY_PROPERTY=Training Ready
+NOTION_ERROR_PROPERTY=AI Error
+NOTION_LIGHTROOM_RECIPE_PROPERTY=Lightroom Recipe
+NOTION_LIGHTROOM_BASIC_PARAMS_PROPERTY=Lightroom Basic Params
+NOTION_LIGHTROOM_COLOR_PARAMS_PROPERTY=Lightroom Color Params
+NOTION_TONE_CURVE_NOTES_PROPERTY=Tone Curve Notes
+NOTION_WEB_PREVIEW_PARAMS_PROPERTY=Web Preview Params
+
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
+NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=eric_tone_unsigned
+NEXT_PUBLIC_CLOUDINARY_FOLDER=eric-tone-dataset
+
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_UPLOAD_PRESET=eric_tone_unsigned
 CLOUDINARY_FOLDER=eric-tone-dataset
 ```
 
-## 3. 設定 Notion 欄位
+## Notion 欄位
 
-請參考：
+請參考 `docs/notion-properties.md`。
 
-```text
-docs/notion-properties.md
-```
-
-最重要欄位：
-
-- Photo ID — Title
-- Original Image — Files & media
-- Edited Image — Files & media
-- AI Status — Status
-- AI Style Cluster — Select
-- Scene Auto — Select
-- Lighting Auto — Select
-- Subject Auto — Select
-- Color Change Tags — Multi-select
-- AI Analysis Summary — Text / Rich text
-- Confidence Score — Number
-- Training Ready — Checkbox
-
-## 4. 設定 Cloudinary
-
-請參考：
-
-```text
-docs/cloudinary-setup.md
-```
-
-Prototype 可以用 unsigned upload preset。正式產品建議改成 signed upload。
-
-## 5. 本機執行
+## Local development
 
 ```bash
+npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-打開：
+## Deploy
 
-```text
-http://localhost:3000
-```
+1. Push to GitHub
+2. Import repo into Vercel
+3. Add Environment Variables
+4. Redeploy
 
-## 6. 部署到 Vercel
+## 注意
 
-1. 把專案 push 到 GitHub
-2. 到 Vercel 新增專案
-3. 選擇這個 repo
-4. 在 Environment Variables 加上 `.env.example` 裡面的變數
-5. Deploy
-
-## 7. 常見錯誤
-
-### Notion API error 403
-
-通常是：
-
-- Notion Integration 沒有被加入資料庫 Connections
-- Integration 沒有 Insert Content 權限
-
-### Notion property not found
-
-Notion 欄位名稱與 `.env.local` 不一致。請確認大小寫與空格完全相同。
-
-### Cloudinary upload failed
-
-通常是：
-
-- `CLOUDINARY_CLOUD_NAME` 錯誤
-- `CLOUDINARY_UPLOAD_PRESET` 不是 unsigned
-- 圖片檔案太大
-
-### OpenAI returned empty analysis
-
-確認：
-
-- OpenAI API key 正確
-- `OPENAI_MODEL` 是支援圖片輸入的模型
-- Cloudinary 圖片 URL 可以公開讀取
-
-## 下一階段
-
-下一步可以加入：
-
-- 使用者帳號
-- 批次上傳
-- Style Cluster 自動合併
-- 從資料集產生 LUT / Preset
-- 真正的「單張照片套用 Eric Tone」功能
+- 這版會在瀏覽器端壓縮圖片，避免大圖直接撞到 Vercel request body limit。
+- AI 產生的是 Lightroom 近似建議值，不是 100% 還原 Lightroom RAW engine。
+- `Web Preview Params` 是給之後做 Canvas / WebGL 預覽用的 JSON。

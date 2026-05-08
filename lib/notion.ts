@@ -34,6 +34,10 @@ function externalFile(name: string, url: string) {
   };
 }
 
+function previewParamsText(analysis: TonePairAnalysis) {
+  return JSON.stringify(analysis.web_preview_params, null, 2);
+}
+
 export async function createNotionTonePairPage(params: {
   photoId: string;
   originalUrl: string;
@@ -74,6 +78,21 @@ export async function createNotionTonePairPage(params: {
     [p.summary]: {
       rich_text: richText(params.analysis.summary)
     },
+    [p.lightroomRecipe]: {
+      rich_text: richText(params.analysis.lightroom_recipe)
+    },
+    [p.lightroomBasicParams]: {
+      rich_text: richText(params.analysis.lightroom_basic_params)
+    },
+    [p.lightroomColorParams]: {
+      rich_text: richText(params.analysis.lightroom_color_params)
+    },
+    [p.toneCurveNotes]: {
+      rich_text: richText(params.analysis.tone_curve_notes)
+    },
+    [p.webPreviewParams]: {
+      rich_text: richText(previewParamsText(params.analysis))
+    },
     [p.confidence]: {
       number: params.analysis.confidence_score
     },
@@ -100,6 +119,29 @@ export async function createNotionTonePairPage(params: {
           object: "block",
           type: "paragraph",
           paragraph: { rich_text: richText(params.analysis.summary) }
+        },
+        {
+          object: "block",
+          type: "heading_2",
+          heading_2: { rich_text: richText("Lightroom Recipe") }
+        },
+        {
+          object: "block",
+          type: "paragraph",
+          paragraph: { rich_text: richText(params.analysis.lightroom_recipe) }
+        },
+        {
+          object: "block",
+          type: "heading_2",
+          heading_2: { rich_text: richText("Web Preview Params") }
+        },
+        {
+          object: "block",
+          type: "code",
+          code: {
+            language: "json",
+            rich_text: richText(previewParamsText(params.analysis))
+          }
         }
       ]
     })

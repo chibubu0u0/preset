@@ -7,9 +7,9 @@
 在 `.env.local` 或 Vercel 環境變數填：
 
 ```env
-CLOUDINARY_CLOUD_NAME=你的_cloud_name
-CLOUDINARY_UPLOAD_PRESET=你的_unsigned_upload_preset
-CLOUDINARY_FOLDER=eric-tone-dataset
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=你的_cloud_name
+NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=你的_unsigned_upload_preset
+NEXT_PUBLIC_CLOUDINARY_FOLDER=eric-tone-dataset
 ```
 
 ## 建立 Unsigned Upload Preset
@@ -18,7 +18,7 @@ CLOUDINARY_FOLDER=eric-tone-dataset
 2. 到 Settings / Upload
 3. 新增 Upload preset
 4. Signing Mode 選 Unsigned
-5. 設定 folder 或讓程式用 `CLOUDINARY_FOLDER`
+5. 設定 folder 或讓程式用 `NEXT_PUBLIC_CLOUDINARY_FOLDER`
 6. 複製 preset 名稱到 `.env.local`
 
 ## 原型安全提醒
