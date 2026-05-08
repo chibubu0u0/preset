@@ -32,3 +32,21 @@ NEXT_PUBLIC_ANALYSIS_JPEG_QUALITY=0.76
 首頁 `/`：使用者上傳單張照片，系統用整體資料集產生 Lightroom 建議與精緻下載圖。
 
 後台 `/admin`：管理你的前後對照資料集、批次分析、AI 整理 Style Family。
+
+## Lightroom-like visual recipe panel
+
+This version adds a graphical Lightroom-inspired Develop panel for the generated recipe. It visualizes the AI-generated `web_preview_params` as sliders for Basic, Color, and Effects. It does not use Adobe branding and is not an official Adobe UI.
+
+## Auto AI Strength 版
+
+這版首頁不提供「預覽 / 下載強度」手動拉桿。AI 會在 `web_preview_params.preview_strength` 中自動判斷調色強度，前端用這個數值產生預覽和下載 JPG。
+
+建議保留：
+
+```env
+NEXT_PUBLIC_DOWNLOAD_MAX_EDGE=3000
+NEXT_PUBLIC_ANALYSIS_MAX_EDGE=1600
+NEXT_PUBLIC_ANALYSIS_JPEG_QUALITY=0.76
+```
+
+`NEXT_PUBLIC_PREVIEW_STRENGTH` 只會當作 AI 未回傳 `preview_strength` 時的備用值。

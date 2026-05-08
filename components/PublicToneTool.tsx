@@ -53,6 +53,11 @@ function safePreviewNumber(params: Record<string, any> | undefined, key: string,
   return clamp(getNumber(params, key, fallback), min, max);
 }
 
+function getAIPreviewStrength(params: Record<string, any> | undefined) {
+  // The user should not tune the intensity manually. AI decides a conservative strength per photo.
+  return clamp(getNumber(params, "preview_strength", defaultPreviewStrength), 0.2, 0.55);
+}
+
 function getHue01(r: number, g: number, b: number) {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -317,6 +322,141 @@ async function downloadEditedPreview(file: File, params: Record<string, any> | u
   URL.revokeObjectURL(url);
 }
 
+type SliderSpec = {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  suffix?: string;
+  precision?: number;
+};
+
+type SliderGroup = {
+  title: string;
+  subtitle?: string;
+  sliders: SliderSpec[];
+};
+
+const lightroomSliderGroups: SliderGroup[] = [
+  {
+    title: "Basic",
+    subtitle: "光線與基礎階調",
+    sliders: [
+      { key: "exposure", label: "Exposure", min: -1, max: 1, precision: 2 },
+      { key: "contrast", label: "Contrast", min: -100, max: 100 },
+      { key: "highlights", label: "Highlights", min: -100, max: 100 },
+      { key: "shadows", label: "Shadows", min: -100, max: 100 },
+      { key: "whites", label: "Whites", min: -100, max: 100 },
+      { key: "blacks", label: "Blacks", min: -100, max: 100 }
+    ]
+  },
+  {
+    title: "Color",
+    subtitle: "色溫、偏色與整體飽和",
+    sliders: [
+      { key: "temperature", label: "Temp", min: -1200, max: 1200, suffix: "K" },
+      { key: "tint", label: "Tint", min: -100, max: 100 },
+      { key: "vibrance", label: "Vibrance", min: -100, max: 100 },
+      { key: "saturation", label: "Saturation", min: -100, max: 100 }
+    ]
+  },
+  {
+    title: "Effects",
+    subtitle: "質感、霧面與邊緣氛圍",
+    sliders: [
+      { key: "clarity", label: "Clarity", min: -100, max: 100 },
+      { key: "fade", label: "Fade", min: 0, max: 100 },
+      { key: "grain", label: "Grain", min: 0, max: 100 },
+      { key: "vignette", label: "Vignette", min: -100, max: 100 }
+    ]
+  }
+];
+
+function getParamValue(params: Record<string, any>, key: string) {
+  const value = Number(params?.[key]);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function sliderPercent(value: number, min: number, max: number) {
+  return clamp((value - min) / (max - min), 0, 1) * 100;
+}
+
+function formatSliderValue(value: number, spec: SliderSpec) {
+  const fixed = spec.precision ?? 0;
+  const text = value > 0 ? `+${value.toFixed(fixed)}` : value.toFixed(fixed);
+  return spec.suffix ? `${text}${spec.suffix}` : text;
+}
+
+function LightroomSlider({ spec, params }: { spec: SliderSpec; params: Record<string, any> }) {
+  const value = getParamValue(params, spec.key);
+  const percent = sliderPercent(value, spec.min, spec.max);
+  const neutral = sliderPercent(0, spec.min, spec.max);
+  const isPositive = percent >= neutral;
+  const left = isPositive ? neutral : percent;
+  const width = Math.abs(percent - neutral);
+
+  return (
+    <div className="lr-slider-row">
+      <div className="lr-slider-labels">
+        <span>{spec.label}</span>
+        <strong>{formatSliderValue(value, spec)}</strong>
+      </div>
+      <div className="lr-slider-track" aria-hidden="true">
+        <span className="lr-slider-zero" style={{ left: `${neutral}%` }} />
+        <span className="lr-slider-fill" style={{ left: `${left}%`, width: `${width}%` }} />
+        <span className="lr-slider-knob" style={{ left: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult["analysis"]> }) {
+  const params = analysis.web_preview_params || {};
+
+  return (
+    <div className="lightroom-shell">
+      <div className="lr-topbar">
+        <div>
+          <span className="lr-app-dot" />
+          <strong>Develop</strong>
+        </div>
+        <span>Eric Tone Recipe</span>
+      </div>
+      <div className="lr-layout">
+        <div className="lr-preview-card">
+          <div className="lr-histogram">
+            <span className="hist hist-a" />
+            <span className="hist hist-b" />
+            <span className="hist hist-c" />
+          </div>
+          <p>這裡把 AI 產生的 Lightroom 建議數值轉成可視化滑桿；不是官方 Adobe 介面，但用類似 Develop 面板的方式讓數值更好讀。</p>
+          <div className="lr-score">
+            <span>Confidence</span>
+            <strong>{Math.round(analysis.confidence_score)}%</strong>
+          </div>
+        </div>
+        <aside className="lr-panel">
+          {lightroomSliderGroups.map((group) => (
+            <section className="lr-section" key={group.title}>
+              <details open>
+                <summary>
+                  <span>{group.title}</span>
+                  {group.subtitle && <small>{group.subtitle}</small>}
+                </summary>
+                <div className="lr-sliders">
+                  {group.sliders.map((spec) => (
+                    <LightroomSlider key={spec.key} spec={spec} params={params} />
+                  ))}
+                </div>
+              </details>
+            </section>
+          ))}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function ResultPanel({ result }: { result: RecipeResult | null }) {
   if (!result?.analysis) return null;
   const a = result.analysis;
@@ -327,17 +467,20 @@ function ResultPanel({ result }: { result: RecipeResult | null }) {
         <span className="badge">{result.styleFamily}</span>
       </div>
       <p>{a.photo_assessment}</p>
+
+      <LightroomStylePanel analysis={a} />
+
       <section>
         <h3>完整建議</h3>
         <pre>{a.lightroom_recipe}</pre>
       </section>
       <div className="grid">
         <section>
-          <h3>Basic</h3>
+          <h3>Basic 文字版</h3>
           <pre>{a.lightroom_basic_params}</pre>
         </section>
         <section>
-          <h3>Color / HSL</h3>
+          <h3>Color / HSL 文字版</h3>
           <pre>{a.lightroom_color_params}</pre>
         </section>
       </div>
@@ -367,7 +510,6 @@ export default function PublicToneTool() {
   const [previewStatus, setPreviewStatus] = useState("");
   const [error, setError] = useState("");
   const [result, setResult] = useState<RecipeResult | null>(null);
-  const [previewStrength, setPreviewStrength] = useState(defaultPreviewStrength);
 
   useEffect(() => {
     if (!file) {
@@ -393,7 +535,7 @@ export default function PublicToneTool() {
         const blob = await renderToneBlob(file, result.analysis.web_preview_params, {
           maxEdge: 1400,
           quality: 0.88,
-          strength: previewStrength,
+          strength: getAIPreviewStrength(result.analysis.web_preview_params),
           skinProtection: true,
           addGrain: false
         });
@@ -416,7 +558,7 @@ export default function PublicToneTool() {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [file, result, previewStrength]);
+  }, [file, result]);
 
   async function run() {
     if (!file || !styleFamily) return;
@@ -455,7 +597,7 @@ export default function PublicToneTool() {
     setError("");
     setDownloadStatus("正在產生精緻下載檔…");
     try {
-      await downloadEditedPreview(file, result?.analysis?.web_preview_params, styleFamily, previewStrength);
+      await downloadEditedPreview(file, result?.analysis?.web_preview_params, styleFamily, getAIPreviewStrength(result?.analysis?.web_preview_params));
       setDownloadStatus("下載已開始");
     } catch (err: any) {
       setDownloadStatus("");
@@ -503,18 +645,9 @@ export default function PublicToneTool() {
             <span className="small">不再硬套單一分類。系統會讀取你 Notion 裡已整理好的整體資料集，依照這張照片的光線、主體與膚色狀態，產生較保守的 Lightroom 建議。</span>
           </div>
 
-          <div className="stack compact-stack">
-            <label className="small" htmlFor="preview-strength">預覽 / 下載強度：{Math.round(previewStrength * 100)}%</label>
-            <input
-              id="preview-strength"
-              type="range"
-              min="25"
-              max="60"
-              step="5"
-              value={Math.round(previewStrength * 100)}
-              onChange={(e) => setPreviewStrength(Number(e.target.value) / 100)}
-            />
-            <span className="small">建議 30–45%。這版會以保守、可用的下載結果為優先，不硬套分類。</span>
+          <div className="tone-mode-box">
+            <strong>AI 自動判斷強度</strong>
+            <span className="small">使用者不用調整拉桿。AI 會依照照片是否有人像、曝光、白平衡與高光狀態，自動決定保守的預覽 / 下載強度。</span>
           </div>
 
           <button disabled={!file || status.includes("中")} onClick={run}>產生 Lightroom 建議</button>
@@ -523,7 +656,7 @@ export default function PublicToneTool() {
         </section>
 
         <section className="card stack">
-          <h2>預覽</h2>
+          <div className="row"><h2>預覽</h2>{result?.analysis?.web_preview_params && <span className="badge">AI 強度 {Math.round(getAIPreviewStrength(result.analysis.web_preview_params) * 100)}%</span>}</div>
           {previewUrl ? (
             <div className="preview-grid">
               <div>
@@ -543,7 +676,7 @@ export default function PublicToneTool() {
             <p>上傳照片後會出現預覽。</p>
           )}
           <p className="small">
-            這版會用 Canvas 做像素級調整，包含曝光、明暗部、色溫、飽和、淡化黑位、暗角與膚色保護；仍是網頁近似效果，不會 100% 等同 Lightroom。
+            這版會用 Canvas 做像素級調整，包含曝光、明暗部、色溫、飽和、淡化黑位、暗角與膚色保護；強度由 AI 自動判斷，仍是網頁近似效果，不會 100% 等同 Lightroom。
           </p>
           <button className="download-button" disabled={!file || !result?.analysis || !!previewStatus} onClick={downloadPreview}>
             下載精緻調色 JPG
