@@ -1,11 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-
-type StyleItem = {
-  name: string;
-  count: number;
-};
+import { useEffect, useState } from "react";
 
 type RecipeResult = {
   ok: boolean;
@@ -25,7 +20,7 @@ type RecipeResult = {
 
 const maxEdge = Number(process.env.NEXT_PUBLIC_ANALYSIS_MAX_EDGE || 1600);
 const jpegQuality = Number(process.env.NEXT_PUBLIC_ANALYSIS_JPEG_QUALITY || 0.76);
-const defaultPreviewStrength = Number(process.env.NEXT_PUBLIC_PREVIEW_STRENGTH || 0.55);
+const defaultPreviewStrength = Number(process.env.NEXT_PUBLIC_PREVIEW_STRENGTH || 0.35);
 
 type RenderOptions = {
   maxEdge: number;
@@ -51,6 +46,11 @@ function smoothstep(edge0: number, edge1: number, x: number) {
 function getNumber(params: Record<string, any> | undefined, key: string, fallback = 0) {
   const value = Number(params?.[key]);
   return Number.isFinite(value) ? value : fallback;
+}
+
+
+function safePreviewNumber(params: Record<string, any> | undefined, key: string, min: number, max: number, fallback = 0) {
+  return clamp(getNumber(params, key, fallback), min, max);
 }
 
 function getHue01(r: number, g: number, b: number) {
@@ -84,19 +84,21 @@ function applyToneToImageData(imageData: ImageData, params: Record<string, any> 
   const data = imageData.data;
   const s = clamp(strength, 0.05, 1);
 
-  const exposure = getNumber(params, "exposure") * s;
-  const contrast = getNumber(params, "contrast") * s;
-  const highlights = getNumber(params, "highlights") * s;
-  const shadows = getNumber(params, "shadows") * s;
-  const whites = getNumber(params, "whites") * s;
-  const blacks = getNumber(params, "blacks") * s;
-  const temperature = getNumber(params, "temperature") * s;
-  const tint = getNumber(params, "tint") * s;
-  const vibrance = getNumber(params, "vibrance") * s;
-  const saturation = getNumber(params, "saturation") * s;
-  const fade = getNumber(params, "fade") * s;
-  const clarity = getNumber(params, "clarity") * s;
-  const grain = Math.max(0, getNumber(params, "grain") * s);
+  // Safety clamps: the web preview is only a subtle approximation of Eric's overall tone.
+  // Avoid extreme AI params that can crush shadows, posterize skin, or make the image unusably dark.
+  const exposure = safePreviewNumber(params, "exposure", -0.25, 0.3) * s;
+  const contrast = safePreviewNumber(params, "contrast", -18, 18) * s;
+  const highlights = safePreviewNumber(params, "highlights", -35, 20) * s;
+  const shadows = safePreviewNumber(params, "shadows", -10, 35) * s;
+  const whites = safePreviewNumber(params, "whites", -20, 15) * s;
+  const blacks = safePreviewNumber(params, "blacks", -10, 28) * s;
+  const temperature = safePreviewNumber(params, "temperature", -450, 450) * s;
+  const tint = safePreviewNumber(params, "tint", -10, 10) * s;
+  const vibrance = safePreviewNumber(params, "vibrance", -12, 18) * s;
+  const saturation = safePreviewNumber(params, "saturation", -15, 8) * s;
+  const fade = safePreviewNumber(params, "fade", 0, 18) * s;
+  const clarity = safePreviewNumber(params, "clarity", -10, 10) * s;
+  const grain = Math.max(0, safePreviewNumber(params, "grain", 0, 12) * s);
 
   const exposureFactor = Math.pow(2, exposure);
   const contrastFactor = clamp(1 + contrast / 130, 0.62, 1.55);
@@ -123,10 +125,10 @@ function applyToneToImageData(imageData: ImageData, params: Record<string, any> 
     const midMask = 1 - Math.abs(luma - 0.5) * 2;
 
     const tonalOffset =
-      (highlights / 100) * 0.22 * highMask +
-      (whites / 100) * 0.14 * whiteMask +
-      (shadows / 100) * 0.22 * shadowMask +
-      (blacks / 100) * 0.13 * blackMask +
+      (highlights / 100) * 0.14 * highMask +
+      (whites / 100) * 0.09 * whiteMask +
+      (shadows / 100) * 0.14 * shadowMask +
+      (blacks / 100) * 0.08 * blackMask +
       fadeLift * blackMask * 0.75;
 
     r += tonalOffset;
@@ -187,7 +189,7 @@ function applyToneToImageData(imageData: ImageData, params: Record<string, any> 
 
 function drawVignette(ctx: CanvasRenderingContext2D, width: number, height: number, strength: number, previewStrength: number) {
   if (!strength) return;
-  const alpha = Math.max(0, Math.min(0.22, Math.abs(strength) / 100 * 0.22 * previewStrength));
+  const alpha = Math.max(0, Math.min(0.08, Math.abs(strength) / 100 * 0.08 * previewStrength));
   const gradient = ctx.createRadialGradient(
     width / 2,
     height / 2,
@@ -356,8 +358,7 @@ function ResultPanel({ result }: { result: RecipeResult | null }) {
 }
 
 export default function PublicToneTool() {
-  const [styles, setStyles] = useState<StyleItem[]>([]);
-  const [styleFamily, setStyleFamily] = useState("冷調自然");
+  const styleFamily = "Eric 整體調色語言";
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [editedPreviewUrl, setEditedPreviewUrl] = useState<string>("");
@@ -367,19 +368,6 @@ export default function PublicToneTool() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<RecipeResult | null>(null);
   const [previewStrength, setPreviewStrength] = useState(defaultPreviewStrength);
-
-  useEffect(() => {
-    fetch("/api/styles")
-      .then((res) => res.json())
-      .then((data) => {
-        const items = Array.isArray(data.styles) ? data.styles : [];
-        setStyles(items);
-        if (!styleFamily && items[0]?.name) setStyleFamily(items[0].name);
-      })
-      .catch(() => {
-        // keep UI usable even if styles cannot be loaded
-      });
-  }, []);
 
   useEffect(() => {
     if (!file) {
@@ -430,8 +418,6 @@ export default function PublicToneTool() {
     };
   }, [file, result, previewStrength]);
 
-  const selectedStyle = useMemo(() => styles.find((s) => s.name === styleFamily), [styles, styleFamily]);
-
   async function run() {
     if (!file || !styleFamily) return;
     setError("");
@@ -446,7 +432,7 @@ export default function PublicToneTool() {
       const res = await fetch("/api/generate-recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, styleFamily })
+        body: JSON.stringify({ imageUrl, useGlobalStyle: true })
       });
       const text = await res.text();
       let data: RecipeResult;
@@ -482,9 +468,9 @@ export default function PublicToneTool() {
       <div className="hero card">
         <div>
           <span className="badge">Eric Tone Lightroom Assistant</span>
-          <h1>把你的照片轉成 Eric 的調色建議</h1>
+          <h1>把你的照片轉成 Eric 的整體調色語言</h1>
           <p>
-            上傳一張 JPG / PNG，選擇一個 Style Family，系統會根據已整理的調色資料庫產生 Lightroom 建議數值與精緻預覽圖。
+            上傳一張 JPG / PNG，系統會參考 Eric 已整理的整體調色資料庫，產生 Lightroom 建議數值與精緻預覽圖。
           </p>
         </div>
         <a className="badge" href="/admin">Admin</a>
@@ -511,28 +497,11 @@ export default function PublicToneTool() {
             </div>
           </label>
 
-          <h2>2. 選擇風格</h2>
-          <select className="select-large" value={styleFamily} onChange={(e) => setStyleFamily(e.target.value)}>
-            {styles.length ? (
-              styles.map((style) => (
-                <option key={style.name} value={style.name}>
-                  {style.name}（{style.count}）
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="冷調自然">冷調自然</option>
-                <option value="冷調城市">冷調城市</option>
-                <option value="低光夜景">低光夜景</option>
-                <option value="暖調室內">暖調室內</option>
-                <option value="柔霧暖光">柔霧暖光</option>
-                <option value="底片褪色">底片褪色</option>
-                <option value="清透日常">清透日常</option>
-                <option value="黑白顆粒">黑白顆粒</option>
-              </>
-            )}
-          </select>
-          {selectedStyle && <p className="small">目前資料庫中有 {selectedStyle.count} 筆可參考資料。</p>}
+          <h2>2. 整體風格</h2>
+          <div className="tone-mode-box">
+            <strong>Eric 整體調色語言</strong>
+            <span className="small">不再硬套單一分類。系統會讀取你 Notion 裡已整理好的整體資料集，依照這張照片的光線、主體與膚色狀態，產生較保守的 Lightroom 建議。</span>
+          </div>
 
           <div className="stack compact-stack">
             <label className="small" htmlFor="preview-strength">預覽 / 下載強度：{Math.round(previewStrength * 100)}%</label>
@@ -540,15 +509,15 @@ export default function PublicToneTool() {
               id="preview-strength"
               type="range"
               min="25"
-              max="85"
+              max="60"
               step="5"
               value={Math.round(previewStrength * 100)}
               onChange={(e) => setPreviewStrength(Number(e.target.value) / 100)}
             />
-            <span className="small">建議 45–65%。人像或暖色照片不要拉太高，會比較自然。</span>
+            <span className="small">建議 30–45%。這版會以保守、可用的下載結果為優先，不硬套分類。</span>
           </div>
 
-          <button disabled={!file || !styleFamily || status.includes("中")} onClick={run}>產生 Lightroom 建議</button>
+          <button disabled={!file || status.includes("中")} onClick={run}>產生 Lightroom 建議</button>
           {status && <strong>{status}</strong>}
           {error && <p className="status-error">{error}</p>}
         </section>

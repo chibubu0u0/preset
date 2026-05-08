@@ -177,7 +177,7 @@ pre {
 .preview-placeholder {
   min-height: 220px;
   border-radius: 20px;
-  border: 1px dashed var(--line);
+  border: 1px dashed var(--border);
   background: rgba(255,255,255,0.45);
   display: grid;
   place-items: center;
@@ -193,4 +193,13 @@ pre {
 input[type="range"] {
   width: 100%;
   accent-color: #1f1b16;
+}
+
+.tone-mode-box {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, .48);
+  border-radius: 18px;
+  padding: 14px 16px;
 }

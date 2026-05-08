@@ -304,3 +304,40 @@ export async function queryStyleExamples(styleFamily: string, limit = 8) {
     confidence: page.properties?.[p.confidence]?.number || null
   }));
 }
+
+
+export async function queryGlobalExamples(limit = 14) {
+  const p = propNames();
+  const dataSourceId = requireEnv("NOTION_DATA_SOURCE_ID");
+  const pageSize = Math.min(Math.max(limit, 1), 30);
+
+  async function query(filter: any) {
+    const data = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+      method: "POST",
+      body: JSON.stringify({ page_size: pageSize, filter })
+    });
+    return data.results || [];
+  }
+
+  // Prefer records that were marked training ready, regardless of Style Family.
+  let pages = await query({ property: p.trainingReady, checkbox: { equals: true } });
+
+  // Fall back to any completed record with an analysis summary.
+  if (!pages.length) {
+    pages = await query({ property: p.summary, rich_text: { is_not_empty: true } });
+  }
+
+  return pages.map((page: any) => ({
+    aiStyleCluster: getSelect(page, p.styleCluster),
+    rawStyleName: getRichText(page, p.rawStyleName),
+    styleFamily: getSelect(page, p.styleFamily),
+    summary: getRichText(page, p.summary),
+    tags: getMultiSelect(page, p.tags),
+    lightroomRecipe: getRichText(page, p.lightroomRecipe),
+    basicParams: getRichText(page, p.lightroomBasic),
+    colorParams: getRichText(page, p.lightroomColor),
+    toneCurveNotes: getRichText(page, p.toneCurve),
+    webPreviewParams: getRichText(page, p.webPreview),
+    confidence: page.properties?.[p.confidence]?.number || null
+  }));
+}

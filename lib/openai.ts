@@ -276,10 +276,11 @@ export type UserRecipeAnalysis = {
 
 export async function generateRecipeForUserPhoto(input: {
   imageUrl: string;
-  styleFamily: string;
+  styleFamily?: string;
   examples: Array<{
     aiStyleCluster?: string;
     rawStyleName?: string;
+    styleFamily?: string;
     summary?: string;
     tags?: string[];
     lightroomRecipe?: string;
@@ -291,9 +292,10 @@ export async function generateRecipeForUserPhoto(input: {
 }): Promise<UserRecipeAnalysis> {
   const model = optionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
   const examplesText = input.examples
-    .slice(0, 8)
+    .slice(0, 14)
     .map((ex, idx) => {
       return `範例 ${idx + 1}
+Style Family: ${ex.styleFamily || ""}
 AI Style Cluster: ${ex.aiStyleCluster || ""}
 Raw Style Name: ${ex.rawStyleName || ""}
 Summary: ${ex.summary || ""}
@@ -376,17 +378,18 @@ Web Preview Params: ${ex.webPreviewParams || ""}`;
             type: "input_text",
             text: `你是 Eric Tone Lightroom Assistant。請根據使用者上傳的照片，以及 Eric 已整理出的調色資料庫範例，產生一組適合這張照片的 Lightroom 建議數值。
 
-選定風格：${input.styleFamily}
+調色方向：請不要用單一歸類硬套。請從 Eric 的整體資料集歸納「共同調色語言」，再依照使用者這張照片做保守調整。
 
 參考資料庫範例：
 ${examplesText || "目前沒有足夠範例，請用保守、自然的方式建議。"}
 
 要求：
 1. 不要聲稱這是精準 Lightroom 自動套用，只能說是建議值。
-2. 根據使用者照片的曝光、光線、主體與風格範例調整數值。
-3. 若照片不適合此風格，請在 usage_notes 裡提醒。
-4. 使用繁體中文。
-5. 數值請接近 Lightroom 調整邏輯，不要過度極端。`
+2. 不要把照片重新變成某個分類；請學習 Eric 整體常見的色彩傾向，例如對比、黑位、陰影色彩、暖冷平衡、飽和度與膚色處理。
+3. 若照片有人像，務必保護膚色，不要把臉壓暗、變灰或變髒。
+4. web_preview_params 必須非常保守，避免整張過暗或出現海報化斷層。請遵守範圍：exposure -0.25 到 0.30、contrast -18 到 18、highlights -35 到 20、shadows -10 到 35、whites -20 到 15、blacks -10 到 28、temperature -450 到 450、tint -10 到 10、vibrance -12 到 18、saturation -15 到 8、grain 0 到 12、vignette -10 到 0、fade 0 到 18、clarity -10 到 10。
+5. Lightroom 文字建議可以比 web_preview_params 更完整，但仍不能過度極端。
+6. 使用繁體中文。`
           },
           { type: "input_image", image_url: input.imageUrl, detail: optionalEnv("OPENAI_IMAGE_DETAIL", "low") }
         ]
