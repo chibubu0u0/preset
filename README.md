@@ -75,3 +75,56 @@ npm run dev
 - 這版會在瀏覽器端壓縮圖片，避免大圖直接撞到 Vercel request body limit。
 - AI 產生的是 Lightroom 近似建議值，不是 100% 還原 Lightroom RAW engine。
 - `Web Preview Params` 是給之後做 Canvas / WebGL 預覽用的 JSON。
+
+## Batch Upload 版本
+
+這版新增「批次上傳」模式，適合一次整理多組前後調色資料。
+
+### 建議檔案整理方式
+
+請準備兩組圖片：Original 與 Edited。檔名要能一一對應。
+
+```text
+original/
+001.jpg
+002.jpg
+003.jpg
+
+edited/
+001.jpg
+002.jpg
+003.jpg
+```
+
+也支援這種命名：
+
+```text
+001_original.jpg
+001_edited.jpg
+002_original.jpg
+002_edited.jpg
+```
+
+系統會自動忽略檔名最後的 `original / edited / before / after / 原圖 / 調色後` 等字樣來配對。
+
+### 使用方式
+
+1. 打開網站。
+2. 切換到「批次上傳」。
+3. 在 Original Images 選擇多張原圖。
+4. 在 Edited Images 選擇多張調色後圖片。
+5. 確認配對數量與未配對提醒。
+6. 按「開始批次分析」。
+
+系統會逐筆處理：
+
+```text
+壓縮分析用小圖
+→ 上傳 Cloudinary
+→ OpenAI 產生 Lightroom Recipe
+→ 寫入 Notion
+```
+
+### 建議大小
+
+每張建議先控制在 JPG、長邊 2000–3000px、1–3MB。系統會自動壓縮分析用圖片，但原始檔過大仍可能造成瀏覽器處理變慢。
