@@ -1,20 +1,24 @@
 {
-  "name": "eric-tone-notion-ai",
+  "name": "eric-tone-web-uploader",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Analyze original/edited photo pairs from Notion with OpenAI Vision and write AI tone analysis back to Notion.",
   "scripts": {
-    "get-data-source": "node src/get-data-source.js",
-    "test-notion": "node src/test-notion.js",
-    "analyze": "node src/analyze-tone-pairs.js",
-    "analyze:dry": "DRY_RUN=true node src/analyze-tone-pairs.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "check-env": "node scripts/check-env.mjs"
   },
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "openai": "^4.104.0"
+    "next": "^15.3.0",
+    "openai": "^4.104.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
-  "engines": {
-    "node": ">=18"
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
   }
 }
