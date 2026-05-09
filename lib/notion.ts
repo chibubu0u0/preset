@@ -27,7 +27,8 @@ export function propNames() {
     rawStyleName: optionalEnv("NOTION_RAW_STYLE_NAME_PROPERTY", "AI Raw Style Name"),
     styleFamily: optionalEnv("NOTION_STYLE_FAMILY_PROPERTY", "Style Family"),
     parsedLightroomValues: optionalEnv("NOTION_PARSED_LIGHTROOM_VALUES_PROPERTY", ""),
-    hasRealLightroomParams: optionalEnv("NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY", "")
+    hasRealLightroomParams: optionalEnv("NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY", ""),
+    metadataStatus: optionalEnv("NOTION_METADATA_STATUS_PROPERTY", "")
   };
 }
 
@@ -351,4 +352,74 @@ export async function queryGlobalExamples(limit = 14) {
     webPreviewParams: getRichText(page, p.webPreview),
     confidence: page.properties?.[p.confidence]?.number || null
   }));
+}
+
+
+export function normalizePhotoKey(value: string) {
+  return String(value || "")
+    .replace(/\.[^.]+$/g, "")
+    .replace(/[._\-\s]*(metadata|xmp|json)$/gi, "")
+    .replace(/[_\-\s]*(original|orig|before|raw|原圖)$/gi, "")
+    .replace(/[_\-\s]*(edited|edit|after|調色後|成品)$/gi, "")
+    .trim()
+    .toLowerCase();
+}
+
+export async function findTonePairPageByKey(key: string) {
+  const p = propNames();
+  const dataSourceId = requireEnv("NOTION_DATA_SOURCE_ID");
+  const normalized = normalizePhotoKey(key);
+  if (!normalized) return null;
+
+  const variants = Array.from(new Set([normalized, normalized.toUpperCase(), normalized.toLowerCase()]));
+
+  for (const queryKey of variants) {
+    const data = await notionRequest(`/data_sources/${dataSourceId}/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        page_size: 10,
+        filter: {
+          property: p.title,
+          title: { contains: queryKey }
+        }
+      })
+    });
+
+    const pages = data.results || [];
+    if (pages.length) {
+      // Prefer an exact-ish title match that contains the normalized key as a suffix/segment.
+      const exact = pages.find((page: any) => normalizePhotoKey(getRichText(page, p.title)).includes(normalized));
+      return exact || pages[0];
+    }
+  }
+
+  return null;
+}
+
+export async function updateLightroomMetadataForPage(pageId: string, input: {
+  parsedLightroomValues: string;
+  hasRealLightroomParams?: boolean;
+  metadataStatus?: "已補" | "解析失敗" | "未補";
+}) {
+  const p = propNames();
+  const properties: Record<string, any> = {};
+
+  if (p.parsedLightroomValues) {
+    properties[p.parsedLightroomValues] = richText(input.parsedLightroomValues);
+  }
+  if (p.hasRealLightroomParams) {
+    properties[p.hasRealLightroomParams] = { checkbox: input.hasRealLightroomParams !== false };
+  }
+  if (p.metadataStatus && input.metadataStatus) {
+    properties[p.metadataStatus] = select(input.metadataStatus);
+  }
+
+  if (!Object.keys(properties).length) {
+    throw new Error("Missing Notion metadata backfill properties. Please set NOTION_PARSED_LIGHTROOM_VALUES_PROPERTY and NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY.");
+  }
+
+  return notionRequest(`/pages/${pageId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ properties })
+  });
 }

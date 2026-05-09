@@ -80,3 +80,44 @@ NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY=Has Real Lightroom Params
 ```
 
 如果沒有設定這兩個環境變數，系統仍然會使用 metadata 幫助 AI 分析，但不會額外寫入這兩個欄位。
+
+## Metadata-only backfill
+
+The `/admin` page includes a `只補 Metadata` tab.
+
+Use this when you already have existing Notion rows and only want to add Lightroom / Camera Raw metadata later.
+
+Recommended file naming:
+
+```text
+DSCF7930.metadata.json
+R0003481.metadata.json
+```
+
+The app matches each JSON file to an existing Notion row by checking whether the row's `Photo ID` contains the normalized filename key, for example:
+
+```text
+Photo ID: ET-20260508143954-dscf7930
+JSON: DSCF7930.metadata.json
+```
+
+Required Notion fields for best results:
+
+```env
+NOTION_PARSED_LIGHTROOM_VALUES_PROPERTY=Parsed Lightroom Values
+NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY=Has Real Lightroom Params
+```
+
+Optional:
+
+```env
+NOTION_METADATA_STATUS_PROPERTY=Metadata Status
+```
+
+Suggested `Metadata Status` select options:
+
+```text
+未補
+已補
+解析失敗
+```

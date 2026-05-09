@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Tab = "single" | "batch" | "classify";
+type Tab = "single" | "batch" | "metadata" | "classify";
 type JobStatus = "pending" | "uploading" | "analyzing" | "done" | "error";
 
 type BatchPair = {
@@ -15,12 +15,21 @@ type BatchPair = {
   result?: any;
 };
 
+type MetadataJob = {
+  key: string;
+  file: File;
+  status: JobStatus;
+  message?: string;
+  result?: any;
+};
+
 const maxEdge = Number(process.env.NEXT_PUBLIC_ANALYSIS_MAX_EDGE || 1600);
 const jpegQuality = Number(process.env.NEXT_PUBLIC_ANALYSIS_JPEG_QUALITY || 0.76);
 
 function normalizeName(fileName: string) {
   const base = fileName.replace(/\.[^.]+$/, "").toLowerCase();
   return base
+    .replace(/[._\-\s]*(metadata|xmp|json)$/i, "")
     .replace(/[_\-\s]*(original|orig|before|raw|原圖)$/i, "")
     .replace(/[_\-\s]*(edited|edit|after|調色後|成品)$/i, "")
     .trim();
@@ -201,6 +210,11 @@ export default function DatasetBuilder() {
   const [jobs, setJobs] = useState<BatchPair[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
 
+  const [metadataOnlyFiles, setMetadataOnlyFiles] = useState<File[]>([]);
+  const [metadataJobs, setMetadataJobs] = useState<MetadataJob[]>([]);
+  const [metadataRunning, setMetadataRunning] = useState(false);
+  const [metadataSummary, setMetadataSummary] = useState<any>(null);
+
   const [classifyLimit, setClassifyLimit] = useState(5);
   const [classifyStatus, setClassifyStatus] = useState("");
   const [classifyResult, setClassifyResult] = useState<any>(null);
@@ -277,6 +291,68 @@ export default function DatasetBuilder() {
     setBatchRunning(false);
   }
 
+  const metadataPreview = useMemo(() => {
+    return metadataOnlyFiles.map((file) => ({
+      key: normalizeName(file.name),
+      file,
+      status: "pending" as JobStatus,
+      message: "等待中"
+    }));
+  }, [metadataOnlyFiles]);
+
+  async function runMetadataBackfill() {
+    const initialJobs = metadataJobs.length ? metadataJobs : metadataPreview;
+    if (!initialJobs.length) return;
+    setMetadataRunning(true);
+    setMetadataSummary(null);
+    const nextJobs = initialJobs.map((job) => ({ ...job, status: "pending" as JobStatus, message: "等待中" }));
+    setMetadataJobs(nextJobs);
+
+    for (let i = 0; i < nextJobs.length; i++) {
+      setMetadataJobs((current) => current.map((job, idx) => (idx === i ? { ...job, status: "analyzing", message: "讀取 JSON 並尋找 Notion 資料列" } : job)));
+      try {
+        const metadataJson = await readMetadataJson(nextJobs[i].file);
+        const res = await fetch("/api/metadata-backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: [{
+              fileName: nextJobs[i].file.name,
+              key: nextJobs[i].key,
+              metadataJson
+            }]
+          })
+        });
+
+        const text = await res.text();
+        let data: any = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch {
+          throw new Error(`伺服器回傳非 JSON 內容：${text.slice(0, 180)}`);
+        }
+        if (!res.ok || data?.ok === false) throw new Error(data?.error || "補 metadata 失敗");
+        const itemResult = data.results?.[0] || data;
+        if (itemResult.status !== "updated") throw new Error(itemResult.message || "沒有更新成功");
+
+        setMetadataJobs((current) =>
+          current.map((job, idx) =>
+            idx === i ? { ...job, status: "done", message: itemResult.message || "完成", result: itemResult } : job
+          )
+        );
+      } catch (error: any) {
+        setMetadataJobs((current) =>
+          current.map((job, idx) =>
+            idx === i ? { ...job, status: "error", message: error?.message || "失敗" } : job
+          )
+        );
+      }
+    }
+
+    setMetadataRunning(false);
+    setMetadataSummary({ done: true });
+  }
+
   async function refreshUnclassifiedCount() {
     setCountStatus("讀取中…");
     try {
@@ -342,6 +418,7 @@ export default function DatasetBuilder() {
       <div className="tabs">
         <button className={`tab ${tab === "single" ? "active" : ""}`} onClick={() => setTab("single")}>單筆上傳</button>
         <button className={`tab ${tab === "batch" ? "active" : ""}`} onClick={() => setTab("batch")}>批次上傳</button>
+        <button className={`tab ${tab === "metadata" ? "active" : ""}`} onClick={() => setTab("metadata")}>只補 Metadata</button>
         <button className={`tab ${tab === "classify" ? "active" : ""}`} onClick={() => setTab("classify")}>AI 整理 Style Family</button>
       </div>
 
@@ -411,6 +488,49 @@ export default function DatasetBuilder() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {tab === "metadata" && (
+        <div className="stack">
+          <div className="card stack">
+            <h2>只上傳 Metadata JSON，自動配對既有資料</h2>
+            <p>
+              這個功能不會重新上傳原圖 / 成品圖，也不會重新做圖片分析。
+              它會用 JSON 檔名去找 Notion 裡既有的 Photo ID，例如
+              <code> DSCF7930.metadata.json </code>會尋找包含 <code>dscf7930</code> 的資料列，
+              然後寫入 Parsed Lightroom Values 與 Has Real Lightroom Params。
+            </p>
+            <FileBox label="Metadata JSON / XMP JSON，多選" accept=".json,application/json" multiple onChange={setMetadataOnlyFiles} />
+            <p>已選擇：{metadataPreview.length} 個 JSON。</p>
+            <div className="row">
+              <button className="secondary" onClick={() => setMetadataJobs(metadataPreview)}>更新配對清單</button>
+              <button disabled={!metadataPreview.length || metadataRunning} onClick={runMetadataBackfill}>開始補到既有 Notion 資料</button>
+            </div>
+            <p className="small">建議一次先補 10～20 個 JSON。若出現找不到資料列，請確認 Photo ID 內有包含原始檔名。</p>
+          </div>
+          {(metadataJobs.length > 0 || metadataPreview.length > 0) && (
+            <div className="card">
+              <h2>Metadata 補資料進度</h2>
+              <table className="table">
+                <thead>
+                  <tr><th>檔名 key</th><th>JSON 檔名</th><th>狀態</th><th>訊息</th></tr>
+                </thead>
+                <tbody>
+                  {(metadataJobs.length ? metadataJobs : metadataPreview).map((job) => (
+                    <tr key={`${job.key}-${job.file.name}`}>
+                      <td>{job.key}</td>
+                      <td>{job.file.name}</td>
+                      <td className={job.status === "done" ? "status-ok" : job.status === "error" ? "status-error" : ""}>{job.status}</td>
+                      <td>{job.message || "等待中"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {metadataSummary && <p className="status-ok">補資料流程已結束。</p>}
             </div>
           )}
         </div>

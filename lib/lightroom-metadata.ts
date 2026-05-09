@@ -36,26 +36,66 @@ function pick(obj: Record<string, any>, key: string): any {
   return obj[key] ?? null;
 }
 
+function cleanCrsKey(key: string): string {
+  // Supports keys from exifr, our browser metadata extractor, and ExifTool -j -a -G1 -s.
+  // Examples:
+  // - Vibrance
+  // - XMP-crs:Vibrance
+  // - XMP-crs:HueAdjustmentRed
+  // - crs:ToneCurvePV2012
+  return key.includes(":") ? key.split(":").pop() || key : key;
+}
+
 function findCrs(metadata: any): Record<string, any> {
-  if (!metadata || typeof metadata !== "object") return {};
-  const crs = metadata?.parserResults?.exifr?.crs;
+  if (!metadata) return {};
+
+  // ExifTool -j returns an array. Use the first object.
+  const source = Array.isArray(metadata) ? metadata[0] : metadata;
+  if (!source || typeof source !== "object") return {};
+
+  const crs = source?.parserResults?.exifr?.crs;
   if (crs && typeof crs === "object") return crs;
 
-  // Fallback for flattened metadata arrays from metadata extraction tools.
+  // Browser metadata extractor format: { metadata: [{ keyPath, values }] }
   const out: Record<string, any> = {};
-  const rows = Array.isArray(metadata?.metadata) ? metadata.metadata : [];
+  const rows = Array.isArray(source?.metadata) ? source.metadata : [];
   for (const row of rows) {
     const key = row?.keyPath;
     const values = row?.values;
     if (!key || !Array.isArray(values) || !values.length) continue;
-    out[key] = values.length === 1 ? values[0] : values;
+    out[cleanCrsKey(key)] = values.length === 1 ? values[0] : values;
   }
+
+  // ExifTool flat object format with grouped keys, e.g. XMP-crs:Vibrance.
+  for (const [rawKey, value] of Object.entries(source)) {
+    if (!rawKey || rawKey === "SourceFile") continue;
+    const lower = rawKey.toLowerCase();
+    const looksLikeCrs = lower.includes("xmp-crs") || lower.includes("crs:");
+    const ungroupedKey = cleanCrsKey(rawKey);
+    const knownUngrouped = [
+      "Temperature", "Tint", "Exposure2012", "Contrast2012", "Highlights2012", "Shadows2012",
+      "Whites2012", "Blacks2012", "Texture", "Clarity2012", "Dehaze", "Vibrance", "Saturation",
+      "ToneCurvePV2012", "ToneCurvePV2012Red", "ToneCurvePV2012Green", "ToneCurvePV2012Blue",
+      "GrainAmount", "PostCropVignetteAmount", "VignetteAmount", "CameraProfile", "ProcessVersion",
+      "RawFileName", "PreservedFileName", "WhiteBalance"
+    ].includes(ungroupedKey) || colors.some((color) =>
+      ungroupedKey === `HueAdjustment${color}` ||
+      ungroupedKey === `SaturationAdjustment${color}` ||
+      ungroupedKey === `LuminanceAdjustment${color}`
+    );
+
+    if (looksLikeCrs || knownUngrouped) {
+      out[ungroupedKey] = value;
+    }
+  }
+
   return out;
 }
 
 export function parseLightroomMetadata(metadata: any): ParsedLightroomMetadata {
   const crs = findCrs(metadata);
-  const exifr = metadata?.parserResults?.exifr || {};
+  const source = Array.isArray(metadata) ? metadata[0] : metadata;
+  const exifr = source?.parserResults?.exifr || {};
   const ifd0 = exifr?.ifd0 || {};
   const xmp = exifr?.xmp || {};
 
