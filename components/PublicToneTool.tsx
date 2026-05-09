@@ -531,10 +531,6 @@ function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult[
             <span className="hist hist-c" />
           </div>
           <p>這裡顯示 AI 產生的 Lightroom 建議值。數值面板是只讀式，不提供使用者手動調強度；實際微調仍建議以 Lightroom 裡的畫面為準。</p>
-          <div className="color-rule-card">
-            <strong>Chibubu 調色傾向</strong>
-            <span>Vibrance 通常 +45～+55；Saturation 約為 Vibrance 的 -1/2，例如 +50 / -25。</span>
-          </div>
           <ConfidencePanel analysis={analysis} />
         </div>
         <aside className="lr-panel">
