@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Eric Tone Lightroom Assistant",
+  title: "Chibubu AI Lightroom Assistant",
   description: "Public Lightroom recipe assistant with an admin dataset builder."
 };
 

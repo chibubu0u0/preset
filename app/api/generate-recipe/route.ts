@@ -25,13 +25,13 @@ export async function POST(req: Request) {
 
     const analysis = await generateRecipeForUserPhoto({
       imageUrl: body.imageUrl,
-      styleFamily: useGlobal ? "Eric 整體調色語言" : body.styleFamily,
+      styleFamily: useGlobal ? "Chibubu 整體調色語言" : body.styleFamily,
       examples
     });
 
     return NextResponse.json({
       ok: true,
-      styleFamily: useGlobal ? "Eric 整體調色語言" : body.styleFamily,
+      styleFamily: useGlobal ? "Chibubu 整體調色語言" : body.styleFamily,
       mode: useGlobal ? "global" : "family",
       examplesUsed: examples.length,
       analysis

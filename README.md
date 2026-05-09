@@ -1,6 +1,6 @@
-# Eric Tone Global Style Assistant
+# Chibubu Global Style Assistant
 
-這版把首頁使用者工具改成「Eric 整體調色語言」模式：
+這版把首頁使用者工具改成「Chibubu 整體調色語言」模式：
 
 - 不再要求使用者選 Style Family
 - 會讀取 Notion 裡已整理的整體資料集

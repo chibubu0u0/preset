@@ -315,7 +315,7 @@ export default function DatasetBuilder() {
     <main className="container">
       <div className="header">
         <div>
-          <h1>Eric Tone Admin</h1>
+          <h1>Chibubu Tone Admin</h1>
           <p>管理資料集、批次分析前後圖，並整理 Style Family。一般使用者前台在 /。</p>
         </div>
         <a className="badge" href="/">前往使用者前台</a>

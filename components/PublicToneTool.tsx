@@ -102,7 +102,7 @@ function applyToneToImageData(imageData: ImageData, params: Record<string, any> 
   const data = imageData.data;
   const s = clamp(strength, 0.05, 1);
 
-  // Safety clamps: the web preview is only a subtle approximation of Eric's overall tone.
+  // Safety clamps: the web preview is only a subtle approximation of Chibubu's overall tone.
   // Avoid extreme AI params that can crush shadows, posterize skin, or make the image unusably dark.
   const exposure = safePreviewNumber(params, "exposure", -0.25, 0.3) * s;
   const contrast = safePreviewNumber(params, "contrast", -18, 18) * s;
@@ -521,7 +521,7 @@ function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult[
           <span className="lr-app-dot" />
           <strong>Develop</strong>
         </div>
-        <span>Eric Tone Recipe</span>
+        <span>Chibubu Tone Recipe</span>
       </div>
       <div className="lr-layout">
         <div className="lr-preview-card">
@@ -532,7 +532,7 @@ function LightroomStylePanel({ analysis }: { analysis: NonNullable<RecipeResult[
           </div>
           <p>這裡顯示 AI 產生的 Lightroom 建議值。數值面板是只讀式，不提供使用者手動調強度；實際微調仍建議以 Lightroom 裡的畫面為準。</p>
           <div className="color-rule-card">
-            <strong>Eric 色彩規則</strong>
+            <strong>Chibubu 調色傾向</strong>
             <span>Vibrance 通常 +45～+55；Saturation 約為 Vibrance 的 -1/2，例如 +50 / -25。</span>
           </div>
           <ConfidencePanel analysis={analysis} />
@@ -650,7 +650,7 @@ function ResultPanel({ result }: { result: RecipeResult | null }) {
 }
 
 export default function PublicToneTool() {
-  const styleFamily = "Eric 整體調色語言";
+  const styleFamily = "Chibubu 整體調色語言";
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [editedPreviewUrl, setEditedPreviewUrl] = useState<string>("");
@@ -758,10 +758,10 @@ export default function PublicToneTool() {
     <main className="container public-container">
       <div className="hero card">
         <div>
-          <span className="badge">Eric Tone Lightroom Assistant</span>
-          <h1>把你的照片轉成 Eric 的整體調色語言</h1>
+          <span className="badge">Chibubu AI Lightroom Assistant</span>
+          <h1>把你的照片轉成 Chibubu 的整體調色語言</h1>
           <p>
-            上傳一張 JPG / PNG，系統會參考 Eric 已整理的整體調色資料庫，產生 Lightroom 建議數值與精緻預覽圖。
+            上傳一張 JPG / PNG，系統會參考 Chibubu 已整理的整體調色資料庫，產生 Lightroom 建議數值與精緻預覽圖。
           </p>
         </div>
         <a className="badge" href="/admin">Admin</a>
@@ -790,7 +790,7 @@ export default function PublicToneTool() {
 
           <h2>2. 整體風格</h2>
           <div className="tone-mode-box">
-            <strong>Eric 整體調色語言</strong>
+            <strong>Chibubu 整體調色語言</strong>
             <span className="small">不再硬套單一分類。系統會讀取你 Notion 裡已整理好的整體資料集，依照這張照片的光線、主體與膚色狀態，產生較保守的 Lightroom 建議。</span>
           </div>
 
