@@ -9,6 +9,7 @@ type BatchPair = {
   key: string;
   original: File;
   edited: File;
+  metadata?: File;
   status: JobStatus;
   message?: string;
   result?: any;
@@ -102,7 +103,18 @@ async function uploadToCloudinary(file: File, label: "original" | "edited") {
   return data.secure_url as string;
 }
 
-function FileBox({ label, multiple, onChange }: { label: string; multiple?: boolean; onChange: (files: File[]) => void }) {
+
+async function readMetadataJson(file?: File | null) {
+  if (!file) return null;
+  const text = await file.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${file.name} 不是有效的 JSON 檔案`);
+  }
+}
+
+function FileBox({ label, multiple, onChange, accept = "image/*" }: { label: string; multiple?: boolean; onChange: (files: File[]) => void; accept?: string }) {
   return (
     <label className="drop">
       <div className="stack">
@@ -110,7 +122,7 @@ function FileBox({ label, multiple, onChange }: { label: string; multiple?: bool
         <span className="small">建議 JPG，長邊 1200–1600px 分析最快；大圖會在前端自動壓縮。</span>
         <input
           type="file"
-          accept="image/*"
+          accept={accept}
           multiple={multiple}
           onChange={(e) => onChange(Array.from(e.target.files || []))}
         />
@@ -146,11 +158,13 @@ function ResultBlock({ data }: { data: any }) {
   );
 }
 
-async function analyzePair(original: File, edited: File, writeToNotion: boolean, setMessage?: (msg: string) => void) {
+async function analyzePair(original: File, edited: File, writeToNotion: boolean, setMessage?: (msg: string) => void, metadata?: File | null) {
   setMessage?.("上傳原圖到 Cloudinary…");
   const originalUrl = await uploadToCloudinary(original, "original");
   setMessage?.("上傳調色後圖片到 Cloudinary…");
   const editedUrl = await uploadToCloudinary(edited, "edited");
+  setMessage?.(metadata ? "讀取 Lightroom metadata…" : "AI 分析中…");
+  const metadataJson = await readMetadataJson(metadata);
   setMessage?.("AI 分析中…");
 
   const res = await fetch("/api/analyze", {
@@ -160,7 +174,8 @@ async function analyzePair(original: File, edited: File, writeToNotion: boolean,
       photoId: makePhotoId(),
       originalUrl,
       editedUrl,
-      writeToNotion
+      writeToNotion,
+      metadataJson
     })
   });
 
@@ -174,6 +189,7 @@ export default function DatasetBuilder() {
   const [tab, setTab] = useState<Tab>("single");
   const [singleOriginal, setSingleOriginal] = useState<File | null>(null);
   const [singleEdited, setSingleEdited] = useState<File | null>(null);
+  const [singleMetadata, setSingleMetadata] = useState<File | null>(null);
   const [writeToNotion, setWriteToNotion] = useState(true);
   const [singleStatus, setSingleStatus] = useState("");
   const [singleResult, setSingleResult] = useState<any>(null);
@@ -181,6 +197,7 @@ export default function DatasetBuilder() {
 
   const [originalFiles, setOriginalFiles] = useState<File[]>([]);
   const [editedFiles, setEditedFiles] = useState<File[]>([]);
+  const [metadataFiles, setMetadataFiles] = useState<File[]>([]);
   const [jobs, setJobs] = useState<BatchPair[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
 
@@ -193,6 +210,7 @@ export default function DatasetBuilder() {
 
   const pairedPreview = useMemo(() => {
     const editedMap = new Map(editedFiles.map((file) => [normalizeName(file.name), file]));
+    const metadataMap = new Map(metadataFiles.map((file) => [normalizeName(file.name), file]));
     const pairs: BatchPair[] = [];
     const missingEdited: string[] = [];
 
@@ -200,7 +218,7 @@ export default function DatasetBuilder() {
       const key = normalizeName(original.name);
       const edited = editedMap.get(key);
       if (edited) {
-        pairs.push({ key, original, edited, status: "pending" });
+        pairs.push({ key, original, edited, metadata: metadataMap.get(key), status: "pending" });
       } else {
         missingEdited.push(original.name);
       }
@@ -210,14 +228,14 @@ export default function DatasetBuilder() {
     const missingOriginal = editedFiles.filter((file) => !originalKeys.has(normalizeName(file.name))).map((file) => file.name);
 
     return { pairs, missingEdited, missingOriginal };
-  }, [originalFiles, editedFiles]);
+  }, [originalFiles, editedFiles, metadataFiles]);
 
   async function runSingle() {
     if (!singleOriginal || !singleEdited) return;
     setSingleError("");
     setSingleResult(null);
     try {
-      const result = await analyzePair(singleOriginal, singleEdited, writeToNotion, setSingleStatus);
+      const result = await analyzePair(singleOriginal, singleEdited, writeToNotion, setSingleStatus, singleMetadata);
       setSingleStatus("分析完成");
       setSingleResult(result);
     } catch (error: any) {
@@ -242,7 +260,7 @@ export default function DatasetBuilder() {
       try {
         const result = await analyzePair(nextJobs[i].original, nextJobs[i].edited, writeToNotion, (message) => {
           setJobs((current) => current.map((job, idx) => (idx === i ? { ...job, message } : job)));
-        });
+        }, nextJobs[i].metadata);
         setJobs((current) =>
           current.map((job, idx) =>
             idx === i ? { ...job, status: "done", message: "完成", result } : job
@@ -341,7 +359,9 @@ export default function DatasetBuilder() {
           <div className="grid">
             <FileBox label="Original Image 原圖" onChange={(files) => setSingleOriginal(files[0] || null)} />
             <FileBox label="Edited Image 調色後" onChange={(files) => setSingleEdited(files[0] || null)} />
+            <FileBox label="Metadata JSON / XMP JSON（可選）" accept=".json,application/json" onChange={(files) => setSingleMetadata(files[0] || null)} />
           </div>
+          {singleMetadata && <p className="small">已選擇 metadata：{singleMetadata.name}。系統會優先參考真實 Lightroom 參數。</p>}
           <div className="row card">
             <div>
               <strong>{singleStatus || "等待上傳"}</strong>
@@ -358,16 +378,17 @@ export default function DatasetBuilder() {
           <div className="grid">
             <FileBox label="Original Images 原圖，多選" multiple onChange={setOriginalFiles} />
             <FileBox label="Edited Images 調色後，多選" multiple onChange={setEditedFiles} />
+            <FileBox label="Metadata JSON / XMP JSON（可選，多選）" accept=".json,application/json" multiple onChange={setMetadataFiles} />
           </div>
           <div className="card stack">
             <div className="row">
               <div>
                 <h2>配對檢查</h2>
-                <p>系統會用檔名配對，例如 original/001.jpg 對 edited/001.jpg。</p>
+                <p>系統會用檔名配對，例如 original/001.jpg 對 edited/001.jpg；若有 metadata/001.json，會一起套用真實 Lightroom 參數。</p>
               </div>
               <button className="secondary" onClick={prepareBatch}>更新配對清單</button>
             </div>
-            <p>已配對：{pairedPreview.pairs.length} 組</p>
+            <p>已配對：{pairedPreview.pairs.length} 組；其中 {pairedPreview.pairs.filter((p) => p.metadata).length} 組含 metadata JSON。</p>
             {pairedPreview.missingEdited.length > 0 && <p className="status-error">缺少調色後：{pairedPreview.missingEdited.join("、")}</p>}
             {pairedPreview.missingOriginal.length > 0 && <p className="status-error">缺少原圖：{pairedPreview.missingOriginal.join("、")}</p>}
             <button disabled={!pairedPreview.pairs.length || batchRunning} onClick={runBatch}>開始批次分析</button>
@@ -377,12 +398,13 @@ export default function DatasetBuilder() {
               <h2>批次進度</h2>
               <table className="table">
                 <thead>
-                  <tr><th>檔名 key</th><th>狀態</th><th>訊息</th></tr>
+                  <tr><th>檔名 key</th><th>Metadata</th><th>狀態</th><th>訊息</th></tr>
                 </thead>
                 <tbody>
                   {(jobs.length ? jobs : pairedPreview.pairs).map((job) => (
                     <tr key={job.key}>
                       <td>{job.key}</td>
+                      <td>{job.metadata ? "有" : "—"}</td>
                       <td className={job.status === "done" ? "status-ok" : job.status === "error" ? "status-error" : ""}>{job.status}</td>
                       <td>{job.message || "等待中"}</td>
                     </tr>

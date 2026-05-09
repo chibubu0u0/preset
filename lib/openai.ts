@@ -82,7 +82,7 @@ async function responsesCreate(body: any): Promise<any> {
   }
 }
 
-export async function analyzeTonePair(originalUrl: string, editedUrl: string): Promise<ToneAnalysis> {
+export async function analyzeTonePair(originalUrl: string, editedUrl: string, realLightroomValues?: string): Promise<ToneAnalysis> {
   const model = optionalEnv("OPENAI_MODEL", "gpt-4.1-mini");
   const families = getStyleFamilies();
 
@@ -175,6 +175,13 @@ export async function analyzeTonePair(originalUrl: string, editedUrl: string): P
 2. 產生可讀的 Lightroom 建議數值。
 3. 產生給網頁預覽用的 web_preview_params。
 4. raw_style_name 可以自由命名，但 style_family 必須只能從以下固定分類選一個：${families.join("、")}。
+
+${realLightroomValues ? `
+
+這組資料附有真實 Lightroom / Camera Raw 調整參數。請把以下數值視為比影像猜測更高優先度的實際調整紀錄，並用它來生成 lightroom_recipe、lightroom_basic_params、lightroom_color_params、tone_curve_notes 與 web_preview_params。不要把它說成推測值。
+
+真實 Lightroom 參數：
+${realLightroomValues}` : ""}
 
 請使用繁體中文。Lightroom 數值可用建議區間，不需宣稱 100% 等同 Lightroom。若不確定，style_family 選「待整理」。`
           },

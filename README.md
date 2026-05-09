@@ -50,3 +50,33 @@ NEXT_PUBLIC_ANALYSIS_JPEG_QUALITY=0.76
 ```
 
 `NEXT_PUBLIC_PREVIEW_STRENGTH` 只會當作 AI 未回傳 `preview_strength` 時的備用值。
+
+## Metadata JSON / XMP JSON 支援
+
+新版 `/admin` 支援在單筆與批次上傳時，額外選擇 `metadata.json` 或由工具轉出的 XMP JSON。檔名會用同一個 key 自動配對，例如：
+
+```text
+original/R0003481.jpg
+edited/R0003481.jpg
+metadata/R0003481.metadata.json
+```
+
+如果 metadata 內含 Lightroom / Camera Raw 的 `crs` 資料，系統會優先把它視為真實調整參數，而不是只靠圖片前後差異推測 Lightroom 數值。
+
+### 建議新增 Notion 欄位
+
+若要把解析後的真實 Lightroom 參數寫回 Notion，請新增：
+
+| 欄位名稱 | 類型 |
+|---|---|
+| Parsed Lightroom Values | Text / Rich text |
+| Has Real Lightroom Params | Checkbox |
+
+然後在 Vercel Environment Variables 加上：
+
+```env
+NOTION_PARSED_LIGHTROOM_VALUES_PROPERTY=Parsed Lightroom Values
+NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY=Has Real Lightroom Params
+```
+
+如果沒有設定這兩個環境變數，系統仍然會使用 metadata 幫助 AI 分析，但不會額外寫入這兩個欄位。

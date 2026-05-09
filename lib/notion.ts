@@ -25,7 +25,9 @@ export function propNames() {
     toneCurve: optionalEnv("NOTION_TONE_CURVE_NOTES_PROPERTY", "Tone Curve Notes"),
     webPreview: optionalEnv("NOTION_WEB_PREVIEW_PARAMS_PROPERTY", "Web Preview Params"),
     rawStyleName: optionalEnv("NOTION_RAW_STYLE_NAME_PROPERTY", "AI Raw Style Name"),
-    styleFamily: optionalEnv("NOTION_STYLE_FAMILY_PROPERTY", "Style Family")
+    styleFamily: optionalEnv("NOTION_STYLE_FAMILY_PROPERTY", "Style Family"),
+    parsedLightroomValues: optionalEnv("NOTION_PARSED_LIGHTROOM_VALUES_PROPERTY", ""),
+    hasRealLightroomParams: optionalEnv("NOTION_HAS_REAL_LIGHTROOM_PARAMS_PROPERTY", "")
   };
 }
 
@@ -91,6 +93,8 @@ export async function createTonePairPage(input: {
   originalUrl: string;
   editedUrl: string;
   analysis: ToneAnalysis;
+  parsedLightroomValues?: string;
+  hasRealLightroomParams?: boolean;
 }) {
   const p = propNames();
   const a = input.analysis;
@@ -116,6 +120,13 @@ export async function createTonePairPage(input: {
     [p.rawStyleName]: richText(a.raw_style_name || a.style_cluster),
     [p.styleFamily]: select(a.style_family || "待整理")
   };
+
+  if (p.parsedLightroomValues && input.parsedLightroomValues) {
+    properties[p.parsedLightroomValues] = richText(input.parsedLightroomValues);
+  }
+  if (p.hasRealLightroomParams && typeof input.hasRealLightroomParams === "boolean") {
+    properties[p.hasRealLightroomParams] = { checkbox: input.hasRealLightroomParams };
+  }
 
   return notionRequest("/pages", {
     method: "POST",
